@@ -1,11 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <meta charset="utf-8">
+    <title>카카오맵 표시하기</title>
+    <!-- CSS로 지도가 표시될 영역의 크기를 설정합니다 -->
+    <style>
+        #map {
+            width: 100%;
+            height: 100vh; /* 화면 전체 채우기 */
+        }
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello World!</h1>
+    <!-- 지도를 담을 영역 -->
+    <div id="map"></div>
+
+    <!-- 카카오맵 API 불러오기 (YOUR_JAVASCRIPT_KEY 부분을 실제 발급받은 키로 교체하세요) -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_JAVASCRIPT_KEY"></script>
+    <script>
+        var container = document.getElementById('map'); // 지도를 담을 DOM 요소를 가져옴
+        var options = {
+            center: new kakao.maps.LatLng(37.566826, 126.9786567), // 지도 중심좌표 (서울시청 기준)
+            level: 3 // 지도 확대 레벨
+        };
+
+        // 지도 생성 및 객체 리턴
+        var map = new kakao.maps.Map(container, options);
+    </script>
 </body>
 </html>
