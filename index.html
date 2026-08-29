@@ -18,18 +18,21 @@
 <body>
     <!-- 지도를 담을 영역 -->
     <div id="map"></div>
-
+    
     <!-- 카카오맵 API 불러오기 (YOUR_JAVASCRIPT_KEY 부분을 실제 발급받은 키로 교체하세요) -->
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284"></script>
+    <!-- 1. autoload=false 파라미터 추가 및 https:// 명시 -->
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
     <script>
-        var container = document.getElementById('map'); // 지도를 담을 DOM 요소를 가져옴
-        var options = {
-            center: new kakao.maps.LatLng(37.566826, 126.9786567), // 지도 중심좌표 (서울시청 기준)
-            level: 3 // 지도 확대 레벨
-        };
+        // 2. SDK 로드가 완전히 완료된 후 지도를 생성하도록 콜백 처리
+        kakao.maps.load(function() {
+            var container = document.getElementById('map'); // 지도를 담을 DOM 요소를 가져옴
+            var options = {
+                center: new kakao.maps.LatLng(37.566826, 126.9786567), // 서울시청 기준
+                level: 3 // 지도 확대 레벨
+            };
 
-        // 지도 생성 및 객체 리턴
-        var map = new kakao.maps.Map(container, options);
+            var map = new kakao.maps.Map(container, options); // 지도 생성 및 객체 리턴
+        });
     </script>
 </body>
 </html>
