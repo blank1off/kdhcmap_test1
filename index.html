@@ -5,24 +5,32 @@
     <title>카카오맵 표시하기</title>
     
     <style>
-        body {
+        /* html과 body의 여백 제거 및 높이 100% 고정 */
+        html, body {
             margin: 0;
             padding: 0;
-        }
-        <!-- CSS로 지도가 표시될 영역의 크기를 설정합니다 -->
-        #map { /* 지도 영역 */
             width: 100%;
-            height: 100vh; /* 화면 전체 채우기 */
+            height: 100%;
         }
-
-        /* 상단 버튼 컨테이너 (지도 위에 레이어로 띄움) */
+    
+        /* 지도 영역 높이를 화면 전체(100vh)로 지정 */
+        #map {
+            width: 100%;
+            height: 100vh; /* 또는 height: 100%; */
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1; /* 지도 레이어 */
+        }
+    
+        /* 상단 버튼 컨테이너 (지도보다 위에 띄움) */
         .button-container {
             position: absolute;
             top: 15px;
             left: 15px;
-            z-index: 10; /* 지도보다 위에 표시되도록 설정 */
+            z-index: 10; /* 지도(z-index: 1)보다 위에 표시 */
             display: flex;
-            gap: 10px; /* 버튼 사이 간격 */
+            gap: 10px;
         }
 
         /* 버튼 스타일 */
