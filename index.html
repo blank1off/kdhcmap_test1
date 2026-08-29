@@ -3,19 +3,58 @@
 <head>
     <meta charset="utf-8">
     <title>카카오맵 표시하기</title>
-    <!-- CSS로 지도가 표시될 영역의 크기를 설정합니다 -->
+    
     <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        /* 지도 영역 */
+        <!-- CSS로 지도가 표시될 영역의 크기를 설정합니다 -->
         #map {
             width: 100%;
             height: 100vh; /* 화면 전체 채우기 */
         }
-        body {
-            margin: 0;
-            padding: 0;
+
+        /* 상단 버튼 컨테이너 (지도 위에 레이어로 띄움) */
+        .button-container {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 10; /* 지도보다 위에 표시되도록 설정 */
+            display: flex;
+            gap: 10px; /* 버튼 사이 간격 */
+        }
+
+        /* 버튼 스타일 */
+        .btn {
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.2s;
+        }
+
+        /* 버튼 터치/클릭 시 효과 */
+        .btn:active {
+            background-color: #f0f0f0;
         }
     </style>
 </head>
 <body>
+    <!-- 상단 좌측 버튼 영역 -->
+    <div class="button-container">
+        <button id="btn1" class="btn" onclick="onBtn1Click()">버튼 1</button>
+        <button id="btn2" class="btn" onclick="onBtn2Click()">버튼 2</button>
+    </div>
     <!-- 지도를 담을 영역 -->
     <div id="map"></div>
     
@@ -33,6 +72,19 @@
 
             var map = new kakao.maps.Map(container, options); // 지도 생성 및 객체 리턴
         });
+
+        // 버튼 1 클릭 이벤트 함수
+        function onBtn1Click() {
+            alert('버튼 1이 클릭되었습니다.');
+            // 예시: 특정 위치로 이동 (강남역)
+            // var moveLatLon = new kakao.maps.LatLng(37.497952, 127.027619);
+            // map.panTo(moveLatLon);
+        }
+
+        // 버튼 2 클릭 이벤트 함수
+        function onBtn2Click() {
+            alert('버튼 2가 클릭되었습니다.');
+        }
     </script>
 </body>
 </html>
