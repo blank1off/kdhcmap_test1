@@ -105,28 +105,6 @@
     var roadviewMode = false;
     var currentMapType = 'roadmap'; // 현재 지도 타입 저장 ('roadmap' | 'skyview')
 
-    /*// kakao.maps.load 감싸는 부분 제거 후 바로 실행
-    window.onload = function() {
-        var container = document.getElementById('map');
-        var bundangCenter = new kakao.maps.LatLng(37.3797697, 127.1159946);
-        var options = {
-            center: bundangCenter,
-            level: 4
-        };
-
-        map = new kakao.maps.Map(container, options);
-
-        var roadviewContainer = document.getElementById('roadview');
-        roadview = new kakao.maps.Roadview(roadviewContainer);
-        roadviewClient = new kakao.maps.RoadviewClient();
-
-        kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-            if (!roadviewMode) return;
-            openRoadview(mouseEvent.latLng);
-        });
-
-        loadCsvPipes('bundang/pipe.csv');
-    };*/
 
     kakao.maps.load(function() { // SDK가 완전히 로드된 후 내부 실행
         var container = document.getElementById('map'); // 지도를 표시할 HTML 요소
@@ -148,7 +126,82 @@
             var position = mouseEvent.latLng;
             openRoadview(position);
         });
+
+        // 깃허브 저장소의 bundang/pipe.csv 파일 읽기
+        loadCsvPipes('bundang/pipe.csv');
     });
+
+    // 지도에서 배관 삭제
+    function clearPipes() {
+        for (var i = 0; i < activePolylines.length; i++) {
+            activePolylines[i].setMap(null);
+        }
+        activePolylines = [];
+    }
+
+    // 1. CSV 파일 읽어오기 (fetch API)
+    function loadCsvPipes(filePath) {
+        clearPipes(); // 기존 배관 지우기
+
+        fetch(filePath)
+            .then(function(response) {
+                if (!response.ok) throw new Error("CSV 파일 로드 실패");
+                return response.text();
+            })
+            .then(function(csvText) {
+                parseAndDrawCsv(csvText);
+            })
+            .catch(function(error) {
+                console.error("오류 발생:", error);
+            });
+    }
+
+    // 2. CSV 파싱 및 배관(Polyline) 그리기
+    function parseAndDrawCsv(csvText) {
+        var lines = csvText.trim().split('\n');
+        if (lines.length <= 1) return;
+
+        // 헤더(첫 줄)를 제외하고 행 단위로 처리
+        for (var i = 1; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+
+            // coordinates 열의 따옴표("...") 구간 잘라내기
+            var coordStartIndex = line.indexOf('"[');
+            var coordEndIndex = line.lastIndexOf(']"');
+
+            if (coordStartIndex === -1 || coordEndIndex === -1) continue;
+
+            var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
+
+            try {
+                var rawCoords = JSON.parse(coordString); // [[lng, lat, alt], ...]
+                var linePath = [];
+
+                // [경도(lng), 위도(lat), 고도] 형태를 LatLng(lat, lng) 객체로 변환
+                for (var j = 0; j < rawCoords.length; j++) {
+                    var lng = rawCoords[j][0];
+                    var lat = rawCoords[j][1];
+                    linePath.push(new kakao.maps.LatLng(lat, lng));
+                }
+
+                // 빨간색 배관 선 생성
+                var polyline = new kakao.maps.Polyline({
+                    path: linePath,
+                    strokeWeight: 5,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 0.85,
+                    strokeStyle: 'solid'
+                });
+
+                polyline.setMap(map);
+                activePolylines.push(polyline);
+
+            } catch (e) {
+                console.error(i + "번째 행 좌표 변환 실패:", e);
+            }
+        }
+    }
 
     const select = document.getElementById("branchs");
     select.addEventListener("change", function () { // 변경시만 발동
