@@ -74,6 +74,20 @@
             display: none; /* 숨겨둠 */
         }
 
+        /* 배관경 텍스트 라벨 스타일 */
+        .pipe-label {
+            background-color: #ffffff;
+            border: 1px solid #333333;
+            border-radius: 4px;
+            padding: 1px 4px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #111111;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            pointer-events: none; /* 마우스 클릭 이벤트가 아래 지도/배관으로 통과되도록 설정 */
+        }
+
     </style>
 </head>
 <body>
@@ -107,13 +121,25 @@
     
     var allPipesData = []; // 파싱된 전체 배관 데이터 저장용 (메모리 로드)
     var activePolylines = []; // 현재 지도 화면상에 렌더링된 Polyline 객체들
+    var activeOverlays = []; // 화면에 그려진 관경 라벨(CustomOverlay) 저장 배열
 
     kakao.maps.load(function() { // SDK가 완전히 로드된 후 내부 실행
         var container = document.getElementById('map'); // 지도를 표시할 HTML 요소
-        var options = {
-            center: new kakao.maps.LatLng(37.566826, 126.9786567), // 서울시청 기준 좌표
-            level: 1 // 지도 초기 확대 레벨
-        };
+        // 1. 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
+            var savedLat = localStorage.getItem('last_lat');
+            var savedLng = localStorage.getItem('last_lng');
+            var savedLevel = localStorage.getItem('last_level');
+
+            var initialCenter = (savedLat && savedLng) 
+                ? new kakao.maps.LatLng(parseFloat(savedLat), parseFloat(savedLng))
+                : new kakao.maps.LatLng(37.3797697, 127.1159946); // 기본값
+
+            var initialLevel = savedLevel ? parseInt(savedLevel, 10) : 3;
+
+            var options = {
+                center: initialCenter,
+                level: initialLevel
+            };
 
         map = new kakao.maps.Map(container, options); // 지도 생성
 
@@ -122,7 +148,8 @@
         roadviewClient = new kakao.maps.RoadviewClient();
 
         // 1. 지도가 이동하거나 확대/축소될 때 화면 범위 안 배관만 다시 그리기
-        kakao.maps.event.addListener(map, 'tilesloaded', function() {
+        kakao.maps.event.addListener(map, 'idle', function() {
+            saveCurrentLocation();
             updateVisiblePipes();
         });
 
@@ -138,12 +165,30 @@
         loadCsvPipes('bundang/pipe.csv');
     });
 
+    // 현재 지도 중심 좌표와 확대 레벨을 브라우저에 저장
+    function saveCurrentLocation() {
+        if (!map) return;
+        var center = map.getCenter();
+        var level = map.getLevel();
+
+        localStorage.setItem('last_lat', center.getLat());
+        localStorage.setItem('last_lng', center.getLng());
+        localStorage.setItem('last_level', level);
+    }
+
     // 지도에서 배관 삭제
     function clearPipes() {
+        // 기존 배관선 삭제
         for (var i = 0; i < activePolylines.length; i++) {
             activePolylines[i].setMap(null);
         }
         activePolylines = [];
+
+        // 기존 관경 라벨 삭제
+        for (var j = 0; j < activeOverlays.length; j++) {
+            activeOverlays[j].setMap(null);
+        }
+        activeOverlays = [];
     }
 
     // 1. CSV 파일 읽어오기 (fetch API)
@@ -221,7 +266,6 @@
         }
     }
 
-    // 3. 레벨/구경 조건 필터링 및 SR_CODE별 색상 적용
     function updateVisiblePipes() {
         if (!map || allPipesData.length === 0) return;
 
@@ -229,7 +273,7 @@
 
         var currentLevel = map.getLevel();
 
-        // 레벨 5 이상일 때 비표시
+        // 레벨 5 이상일 때는 전체 숨김
         if (currentLevel >= 5) {
             return;
         }
@@ -239,20 +283,21 @@
         for (var i = 0; i < allPipesData.length; i++) {
             var pipe = allPipesData[i];
 
-            // 레벨 3, 4일 때 구경 300 미만 통과
+            // 레벨 3, 4일 때는 300mm 이상만 표시
             if (currentLevel >= 3 && pipe.diaCode < 300) {
                 continue;
             }
 
             if (mapBounds.intersects(pipe.bounds)) {
-                // SR_CODE 조건 색상 설정 (S: 붉은색, R: 주황색, 기타: 회색)
+                // 1. SR_CODE별 선 색상 지정
                 var lineColor = '#FF0000'; // 기본 붉은색 ('S')
                 if (pipe.srCode === 'R') {
                     lineColor = '#FFA500'; // 주황색
                 } else if (pipe.srCode !== 'S') {
-                    lineColor = '#888888'; // 그 외 예외 코드 처리용 회색
+                    lineColor = '#888888';
                 }
 
+                // 2. 배관 선(Polyline) 생성
                 var polyline = new kakao.maps.Polyline({
                     path: pipe.path,
                     strokeWeight: 5,
@@ -263,6 +308,23 @@
 
                 polyline.setMap(map);
                 activePolylines.push(polyline);
+
+                // 3. 배관 중앙 좌표 계산 (경로 중간 지점 좌표 사용)
+                var midIndex = Math.floor(pipe.path.length / 2);
+                var centerPosition = pipe.path[midIndex];
+
+                // 4. 관경 라벨 (CustomOverlay) 생성
+                var overlayContent = '<div class="pipe-label">' + pipe.diaCode + 'A</div>';
+
+                var customOverlay = new kakao.maps.CustomOverlay({
+                    position: centerPosition,
+                    content: overlayContent,
+                    xAnchor: 0.5, // 가로 중앙 정렬
+                    yAnchor: 0.5  // 세로 중앙 정렬
+                });
+
+                customOverlay.setMap(map);
+                activeOverlays.push(customOverlay);
             }
         }
     }
