@@ -104,6 +104,7 @@
     var roadviewClient;
     var roadviewMode = false;
     var currentMapType = 'roadmap'; // 현재 지도 타입 저장 ('roadmap' | 'skyview')
+    var activePolylines = [];
 
 
     kakao.maps.load(function() { // SDK가 완전히 로드된 후 내부 실행
@@ -202,10 +203,16 @@
             }
         }
     }
-
-    const select = document.getElementById("branchs");
-    select.addEventListener("change", function () { // 변경시만 발동
-        alert(this.options[this.selectedIndex].text); // this.value 는 인덱스값
+    // 지사 목록 변경 이벤트
+    var select = document.getElementById("branchs"); 
+    select.addEventListener("change", function () { // // 변경시만 발동 this.value 는 인덱스값
+        if (this.value === "1") { // 분당
+            map.panTo(new kakao.maps.LatLng(37.3797697, 127.1159946));
+            loadCsvPipes('bundang/pipe.csv');
+        } else if (this.value === "2") {
+            clearPipes();
+            alert("파주 배관 데이터가 아직 등록되지 않았습니다.");
+        }
     });
 
     // 버튼 하이라이트 상태 업데이트
