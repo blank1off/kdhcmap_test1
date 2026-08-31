@@ -104,8 +104,9 @@
     var roadviewClient;
     var roadviewMode = false;
     var currentMapType = 'roadmap'; // 현재 지도 타입 저장 ('roadmap' | 'skyview')
-    var activePolylines = [];
-
+    
+    var allPipesData = []; // 파싱된 전체 배관 데이터 저장용 (메모리 로드)
+    var activePolylines = []; // 현재 지도 화면상에 렌더링된 Polyline 객체들
 
     kakao.maps.load(function() { // SDK가 완전히 로드된 후 내부 실행
         var container = document.getElementById('map'); // 지도를 표시할 HTML 요소
@@ -119,6 +120,11 @@
         var roadviewContainer = document.getElementById('roadview');
         roadview = new kakao.maps.Roadview(roadviewContainer);
         roadviewClient = new kakao.maps.RoadviewClient();
+
+        // 1. 지도가 이동하거나 확대/축소될 때 화면 범위 안 배관만 다시 그리기
+        kakao.maps.event.addListener(map, 'bounds_changed', function() {
+            updateVisiblePipes();
+        });
 
         // 지도 클릭 이벤트
         kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
@@ -150,24 +156,23 @@
                 return response.text();
             })
             .then(function(csvText) {
-                parseAndDrawCsv(csvText);
+                parseCsvData(csvText); // 메모리에 데이터 파싱 저장
+                updateVisiblePipes();  // 현재 화면 범위 배관 표시
             })
             .catch(function(error) {
                 console.error("오류 발생:", error);
             });
     }
 
-    // 2. CSV 파싱 및 배관(Polyline) 그리기
-    function parseAndDrawCsv(csvText) {
+    // 2. CSV를 파싱하여 좌표 객체 배열로 메모리에 저장만 수행 (그리지 않음)
+    function parseCsvData(csvText) {
         var lines = csvText.trim().split('\n');
         if (lines.length <= 1) return;
 
-        // 헤더(첫 줄)를 제외하고 행 단위로 처리
         for (var i = 1; i < lines.length; i++) {
             var line = lines[i].trim();
             if (!line) continue;
 
-            // coordinates 열의 따옴표("...") 구간 잘라내기
             var coordStartIndex = line.indexOf('"[');
             var coordEndIndex = line.lastIndexOf(']"');
 
@@ -176,19 +181,53 @@
             var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
 
             try {
-                var rawCoords = JSON.parse(coordString); // [[lng, lat, alt], ...]
+                var rawCoords = JSON.parse(coordString);
                 var linePath = [];
+                
+                // 배관의 Bounding Box(최소/최대 좌표)를 구하기 위한 변수
+                var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
 
-                // [경도(lng), 위도(lat), 고도] 형태를 LatLng(lat, lng) 객체로 변환
                 for (var j = 0; j < rawCoords.length; j++) {
                     var lng = rawCoords[j][0];
                     var lat = rawCoords[j][1];
                     linePath.push(new kakao.maps.LatLng(lat, lng));
+
+                    if (lat < minLat) minLat = lat;
+                    if (lat > maxLat) maxLat = lat;
+                    if (lng < minLng) minLng = lng;
+                    if (lng > maxLng) maxLng = lng;
                 }
 
-                // 빨간색 배관 선 생성
-                var polyline = new kakao.maps.Polyline({
+                // 배관 1개당 좌표 경로와 영역(Bounds) 데이터를 저장
+                allPipesData.push({
                     path: linePath,
+                    bounds: new kakao.maps.LatLngBounds(
+                        new kakao.maps.LatLng(minLat, minLng),
+                        new kakao.maps.LatLng(maxLat, maxLng)
+                    )
+                });
+
+            } catch (e) {
+                console.error(i + "번째 행 좌표 변환 실패:", e);
+            }
+        }
+    }
+
+    // 3. 현재 지도 화면 범위(Bounds) 내에 들어오는 배관만 필터링하여 렌더링
+    function updateVisiblePipes() {
+        if (!map || allPipesData.length === 0) return;
+
+        clearPipes(); // 기존 렌더링 배관 삭제
+
+        var mapBounds = map.getBounds(); // 현재 지도 화면 영역 정보
+
+        for (var i = 0; i < allPipesData.length; i++) {
+            var pipe = allPipesData[i];
+
+            // 배관의 경계 영역과 현재 지도 화면 영역이 겹치는지 체크
+            if (mapBounds.intersects(pipe.bounds)) {
+                var polyline = new kakao.maps.Polyline({
+                    path: pipe.path,
                     strokeWeight: 5,
                     strokeColor: '#FF0000',
                     strokeOpacity: 0.85,
@@ -197,20 +236,18 @@
 
                 polyline.setMap(map);
                 activePolylines.push(polyline);
-
-            } catch (e) {
-                console.error(i + "번째 행 좌표 변환 실패:", e);
             }
         }
     }
     // 지사 목록 변경 이벤트
     var select = document.getElementById("branchs"); 
-    select.addEventListener("change", function () { // // 변경시만 발동 this.value 는 인덱스값
-        if (this.value === "1") { // 분당
+    select.addEventListener("change", function () {
+        if (this.value === "1") {
             map.panTo(new kakao.maps.LatLng(37.3797697, 127.1159946));
             loadCsvPipes('bundang/pipe.csv');
         } else if (this.value === "2") {
             clearPipes();
+            allPipesData = [];
             alert("파주 배관 데이터가 아직 등록되지 않았습니다.");
         }
     });
