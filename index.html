@@ -112,7 +112,7 @@
         var container = document.getElementById('map'); // 지도를 표시할 HTML 요소
         var options = {
             center: new kakao.maps.LatLng(37.566826, 126.9786567), // 서울시청 기준 좌표
-            level: 3 // 지도 초기 확대 레벨
+            level: 1 // 지도 초기 확대 레벨
         };
 
         map = new kakao.maps.Map(container, options); // 지도 생성
@@ -122,7 +122,7 @@
         roadviewClient = new kakao.maps.RoadviewClient();
 
         // 1. 지도가 이동하거나 확대/축소될 때 화면 범위 안 배관만 다시 그리기
-        kakao.maps.event.addListener(map, 'bounds_changed', function() {
+        kakao.maps.event.addListener(map, 'tilesloaded', function() {
             updateVisiblePipes();
         });
 
@@ -164,7 +164,7 @@
             });
     }
 
-    // 2. CSV를 파싱하여 좌표 객체 배열로 메모리에 저장만 수행 (그리지 않음)
+    // 2. CSV 파싱 시 SR_CODE 및 DIA_CODE 함께 저장
     function parseCsvData(csvText) {
         var lines = csvText.trim().split('\n');
         if (lines.length <= 1) return;
@@ -178,13 +178,20 @@
 
             if (coordStartIndex === -1 || coordEndIndex === -1) continue;
 
+            // 따옴표 앞부분 속성 데이터 분리
+            var propertiesPart = line.substring(0, coordStartIndex);
+            var columns = propertiesPart.split(',');
+
+            // SR_CODE (인덱스 1), DIA_CODE (인덱스 3)
+            var srCode = columns[1] ? columns[1].trim() : '';
+            var diaCode = parseInt(columns[3], 10) || 0;
+
             var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
 
             try {
                 var rawCoords = JSON.parse(coordString);
                 var linePath = [];
                 
-                // 배관의 Bounding Box(최소/최대 좌표)를 구하기 위한 변수
                 var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
 
                 for (var j = 0; j < rawCoords.length; j++) {
@@ -198,8 +205,9 @@
                     if (lng > maxLng) maxLng = lng;
                 }
 
-                // 배관 1개당 좌표 경로와 영역(Bounds) 데이터를 저장
                 allPipesData.push({
+                    srCode: srCode,   // 'S' 또는 'R' 저장
+                    diaCode: diaCode,
                     path: linePath,
                     bounds: new kakao.maps.LatLngBounds(
                         new kakao.maps.LatLng(minLat, minLng),
@@ -213,23 +221,42 @@
         }
     }
 
-    // 3. 현재 지도 화면 범위(Bounds) 내에 들어오는 배관만 필터링하여 렌더링
+    // 3. 레벨/구경 조건 필터링 및 SR_CODE별 색상 적용
     function updateVisiblePipes() {
         if (!map || allPipesData.length === 0) return;
 
-        clearPipes(); // 기존 렌더링 배관 삭제
+        clearPipes();
 
-        var mapBounds = map.getBounds(); // 현재 지도 화면 영역 정보
+        var currentLevel = map.getLevel();
+
+        // 레벨 5 이상일 때 비표시
+        if (currentLevel >= 5) {
+            return;
+        }
+
+        var mapBounds = map.getBounds();
 
         for (var i = 0; i < allPipesData.length; i++) {
             var pipe = allPipesData[i];
 
-            // 배관의 경계 영역과 현재 지도 화면 영역이 겹치는지 체크
+            // 레벨 3, 4일 때 구경 300 미만 통과
+            if (currentLevel >= 3 && pipe.diaCode < 300) {
+                continue;
+            }
+
             if (mapBounds.intersects(pipe.bounds)) {
+                // SR_CODE 조건 색상 설정 (S: 붉은색, R: 주황색, 기타: 회색)
+                var lineColor = '#FF0000'; // 기본 붉은색 ('S')
+                if (pipe.srCode === 'R') {
+                    lineColor = '#FFA500'; // 주황색
+                } else if (pipe.srCode !== 'S') {
+                    lineColor = '#888888'; // 그 외 예외 코드 처리용 회색
+                }
+
                 var polyline = new kakao.maps.Polyline({
                     path: pipe.path,
                     strokeWeight: 5,
-                    strokeColor: '#FF0000',
+                    strokeColor: lineColor,
                     strokeOpacity: 0.85,
                     strokeStyle: 'solid'
                 });
@@ -289,12 +316,14 @@
     function startRoadviewMode() {
         roadviewMode = true;
         map.setCursor('crosshair'); // 카카오맵 전용 API로 커서 변경
+        map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
         updateButtonHighlight('roadview');
         alert("지도에서 거리뷰를 볼 위치를 선택하세요.");
     }
     // 거리뷰 모드 상태 및 커서 스타일 초기화 함수
     function resetRoadviewMode() {
         roadviewMode = false;
+        map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);    
         map.setCursor('grab');
     }
     // 거리뷰 닫고 지도로 복귀하기
