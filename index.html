@@ -1,94 +1,252 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
     <meta charset="utf-8">
-    <title>카카오맵 표시하기</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- 모바일 화면 비율 맞춤 설정 -->
+    <title>카카오맵 레이아웃</title>
     
     <style>
-        /* html과 body의 여백 제거 및 높이 100% 고정 */
-        html, body {
+        body {
+            width: 100%;
+            height: 100vh;
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr;
         }
-    
-        /* 지도 영역 높이를 화면 전체(100vh)로 지정 */
+        #div1 {
+            background-color: red;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+        }
+        #div2 {
+            position: relative;
+            background-color: blue;
+        }
+        #bnts {
+            position: absolute;
+            top: 10px; /* 지도 위 위치 */
+            right: 10px;
+            z-index: 10;  /* 지도보다 위에 표시 */
+            display: flex;
+            gap: 5px;
+        }
+        /* 기본 버튼 스타일 */
+        .btn {
+            background-color: #ffffff;
+            color: #333333;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .btn:active {
+            background-color: #eeeeee;
+        }
+        /* 현재 선택된 모드 버튼 하이라이트 스타일 */
+        .btn.active {
+            background-color: #2b6cb0;
+            color: #ffffff;
+            border-color: #2b6cb0;
+        }
         #map {
-            width: 100%;
-            height: 100vh; /* 또는 height: 100%; */
+            background-color: green;
             position: absolute;
             top: 0;
             left: 0;
-            z-index: 1; /* 지도 레이어 */
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
         }
-    
-        /* 상단 버튼 컨테이너 (지도보다 위에 띄움) */
-        .button-container {
+        #roadview {
+            background-color: yellow;
             position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 10; /* 지도(z-index: 1)보다 위에 표시 */
-            display: flex;
-            gap: 10px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            display: none; /* 숨겨둠 */
         }
 
-        /* 버튼 스타일 */
-        .btn {
-            background-color: #ffffff;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 10px 16px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            transition: background-color 0.2s;
-        }
-
-        /* 버튼 터치/클릭 시 효과 */
-        .btn:active {
-            background-color: #f0f0f0;
-        }
     </style>
 </head>
 <body>
-    <!-- 상단 좌측 버튼 영역 -->
-    <div class="button-container">
-        <button id="btn1" class="btn" onclick="onBtn1Click()">버튼 1</button>
-        <button id="btn2" class="btn" onclick="onBtn2Click()">버튼 2</button>
+    <div id="div1">
+        <div id="div11">title</div>
+        <select id="branchs">
+            <option value="1" selected>분당</option>
+            <option value="2">파주</option>
+        </select>
     </div>
-    <!-- 지도를 담을 영역 -->
-    <div id="map"></div>
-    
-    <!-- 카카오맵 API 불러오기 (YOUR_JAVASCRIPT_KEY 부분을 실제 발급받은 키로 교체하세요) -->
-    <!-- 1. autoload=false 파라미터 추가 및 https:// 명시 -->
-    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
-    <script>
-        // 2. SDK 로드가 완전히 완료된 후 지도를 생성하도록 콜백 처리
-        kakao.maps.load(function() {
-            var container = document.getElementById('map'); // 지도를 담을 DOM 요소를 가져옴
-            var options = {
-                center: new kakao.maps.LatLng(37.566826, 126.9786567), // 서울시청 기준
-                level: 3 // 지도 확대 레벨
-            };
+    <div id="div2">
+        <div id="bnts">
+            <button id="mapBtn" class="btn active" onclick="setMapType('roadmap')">지도</button>
+            <button id="skyviewBtn" class="btn" onclick="setMapType('skyview')">위성</button>
+            <button id="roadviewBtn" class="btn" onclick="startRoadviewMode()">거리뷰</button>
+            <button id="closeRoadviewBtn" class="btn" onclick="closeRoadview()" style="display: none;">지도로 돌아가기</button>
+        </div>
 
-            var map = new kakao.maps.Map(container, options); // 지도 생성 및 객체 리턴
+        <div id="map"></div>
+        <div id="roadview"></div>
+    </div>
+</body>
+
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
+<script>
+    var map; // 전역 지도 객체 선언
+    var roadview;
+    var roadviewClient;
+    var roadviewMode = false;
+    var currentMapType = 'roadmap'; // 현재 지도 타입 저장 ('roadmap' | 'skyview')
+
+    /*// kakao.maps.load 감싸는 부분 제거 후 바로 실행
+    window.onload = function() {
+        var container = document.getElementById('map');
+        var bundangCenter = new kakao.maps.LatLng(37.3797697, 127.1159946);
+        var options = {
+            center: bundangCenter,
+            level: 4
+        };
+
+        map = new kakao.maps.Map(container, options);
+
+        var roadviewContainer = document.getElementById('roadview');
+        roadview = new kakao.maps.Roadview(roadviewContainer);
+        roadviewClient = new kakao.maps.RoadviewClient();
+
+        kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+            if (!roadviewMode) return;
+            openRoadview(mouseEvent.latLng);
         });
 
-        // 버튼 1 클릭 이벤트 함수
-        function onBtn1Click() {
-            alert('버튼 1이 클릭되었습니다.');
-            // 예시: 특정 위치로 이동 (강남역)
-            // var moveLatLon = new kakao.maps.LatLng(37.497952, 127.027619);
-            // map.panTo(moveLatLon);
+        loadCsvPipes('bundang/pipe.csv');
+    };*/
+
+    kakao.maps.load(function() { // SDK가 완전히 로드된 후 내부 실행
+        var container = document.getElementById('map'); // 지도를 표시할 HTML 요소
+        var options = {
+            center: new kakao.maps.LatLng(37.566826, 126.9786567), // 서울시청 기준 좌표
+            level: 3 // 지도 초기 확대 레벨
+        };
+
+        map = new kakao.maps.Map(container, options); // 지도 생성
+
+        var roadviewContainer = document.getElementById('roadview');
+        roadview = new kakao.maps.Roadview(roadviewContainer);
+        roadviewClient = new kakao.maps.RoadviewClient();
+
+        // 지도 클릭 이벤트
+        kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+            if (!roadviewMode) return; // 거리뷰 버튼을 누른 상태가 아니면 무시
+
+            var position = mouseEvent.latLng;
+            openRoadview(position);
+        });
+    });
+
+    const select = document.getElementById("branchs");
+    select.addEventListener("change", function () { // 변경시만 발동
+        alert(this.options[this.selectedIndex].text); // this.value 는 인덱스값
+    });
+
+    // 버튼 하이라이트 상태 업데이트
+    function updateButtonHighlight(activeType) {
+        document.getElementById('mapBtn').classList.remove('active');
+        document.getElementById('skyviewBtn').classList.remove('active');
+        document.getElementById('roadviewBtn').classList.remove('active');
+
+        if (activeType === 'roadmap') {
+            document.getElementById('mapBtn').classList.add('active');
+        } else if (activeType === 'skyview') {
+            document.getElementById('skyviewBtn').classList.add('active');
+        } else if (activeType === 'roadview') {
+            document.getElementById('roadviewBtn').classList.add('active');
+        }
+    }
+
+    // 지도 / 위성 모드 전환 함수
+    function setMapType(maptype) {
+        // 거리뷰가 열려있다면 닫고 지도로 복귀
+        if (document.getElementById('roadview').style.display === 'block') {
+            closeRoadview();
         }
 
-        // 버튼 2 클릭 이벤트 함수
-        function onBtn2Click() {
-            alert('버튼 2가 클릭되었습니다.');
+        if (maptype === 'roadmap') {
+            map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+            currentMapType = 'roadmap';
+        } else if (maptype === 'skyview') {
+            map.setMapTypeId(kakao.maps.MapTypeId.HYBRID); // 위성지도 + 라벨
+            currentMapType = 'skyview';
         }
-    </script>
-</body>
+
+        resetRoadviewMode();
+        updateButtonHighlight(maptype);
+    }
+
+    function startRoadviewMode() {
+        roadviewMode = true;
+        map.setCursor('crosshair'); // 카카오맵 전용 API로 커서 변경
+        updateButtonHighlight('roadview');
+        alert("지도에서 거리뷰를 볼 위치를 선택하세요.");
+    }
+    // 거리뷰 모드 상태 및 커서 스타일 초기화 함수
+    function resetRoadviewMode() {
+        roadviewMode = false;
+        map.setCursor('grab');
+    }
+    // 거리뷰 닫고 지도로 복귀하기
+    function closeRoadview() {
+        // 1. 로드뷰 숨기기 및 지도 화면 재표시
+        document.getElementById('roadview').style.display = 'none';
+        document.getElementById('map').style.display = 'block';
+
+        // 2. 버튼 상태 복구
+        document.getElementById('mapBtn').style.display = 'block';
+        document.getElementById('skyviewBtn').style.display = 'block';
+        document.getElementById('roadviewBtn').style.display = 'block';
+        document.getElementById('closeRoadviewBtn').style.display = 'none';
+
+        // 3. 지도가 렌더링을 다시 하도록 레이아웃 재계산
+        map.relayout();
+
+        resetRoadviewMode(); // 모드 초기화
+        updateButtonHighlight(currentMapType);
+    }
+    
+    function openRoadview(position) {
+        // 설정한 좌표에서 가장 가까운 로드뷰 파노라마 ID를 찾아 로드뷰를 실행합니다.
+        roadviewClient.getNearestPanoId(position, 50, function(panoId) {
+            if (panoId === null) {
+                alert('이 위치 주변에는 로드뷰를 지원하지 않습니다.');
+                // 로드뷰 실패 시 원래 지도 모드 하이라이트로 복귀
+                resetRoadviewMode();
+                updateButtonHighlight(currentMapType);
+            } else {
+                // 1. 로드뷰 데이터 세팅
+                roadview.setPanoId(panoId, position);
+
+                // 2. 지도 숨기기 및 로드뷰 화면 전환
+                document.getElementById('map').style.display = 'none';
+                document.getElementById('roadview').style.display = 'block';
+
+                // 3. 버튼 텍스트/표시 상태 전환
+                document.getElementById('mapBtn').style.display = 'none';
+                document.getElementById('skyviewBtn').style.display = 'none';
+                document.getElementById('roadviewBtn').style.display = 'none';
+                document.getElementById('closeRoadviewBtn').style.display = 'block';
+
+                // 4. 로드뷰 화면 크기 레이아웃 재계산
+                roadview.relayout();
+
+                resetRoadviewMode(); // 모드 초기화
+            }
+        });
+    }
+</script>
 </html>
