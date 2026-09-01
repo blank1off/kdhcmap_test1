@@ -216,8 +216,9 @@
                 var columns = propertiesPart.split(',');
 
                 var srCode = columns[1] ? columns[1].trim() : '';
-                var diaCode = parseInt(columns[3], 10) || 0;
-                var pipeGroup = columns[11] ? columns[11].trim() : ''; // PIPE_GROUP 추가
+                var pipeGroup = columns[3] ? columns[3].trim() : ''; // PIPE_GROUP 추가
+                var diaCode = parseInt(columns[4], 10) || 0;
+                
 
                 var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
 
