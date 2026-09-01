@@ -2,10 +2,11 @@
 <html lang="ko">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- 모바일 화면 비율 맞춤 설정 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>카카오맵 레이아웃</title>
     
     <style>
+        * { box-sizing: border-box; }
         body {
             width: 100%;
             height: 100vh;
@@ -14,25 +15,25 @@
             grid-template-rows: auto 1fr;
         }
         #div1 {
-            background-color: red;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 5px 10px;
+            z-index: 20;
         }
         #div2 {
             position: relative;
-            background-color: blue;
         }
         #bnts {
             position: absolute;
-            top: 10px; /* 지도 위 위치 */
+            top: 10px;
             right: 10px;
-            z-index: 10;  /* 지도보다 위에 표시 */
+            z-index: 10;
             display: flex;
             gap: 5px;
         }
-        /* 기본 버튼 스타일 */
         .btn {
             background-color: #ffffff;
             color: #333333;
@@ -47,31 +48,24 @@
         .btn:active {
             background-color: #eeeeee;
         }
-        /* 현재 선택된 모드 버튼 하이라이트 스타일 */
         .btn.active {
             background-color: #2b6cb0;
             color: #ffffff;
             border-color: #2b6cb0;
         }
         #map {
-            background-color: green;
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             z-index: 1;
             display: block;
         }
         #roadview {
-            background-color: yellow;
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             z-index: 2;
-            display: none; /* 숨겨둠 */
+            display: none;
         }
 
         /* 배관경 텍스트 라벨 스타일 */
@@ -85,14 +79,13 @@
             color: #111111;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             white-space: nowrap;
-            pointer-events: none; /* 마우스 클릭 이벤트가 아래 지도/배관으로 통과되도록 설정 */
+            pointer-events: none;
         }
-
     </style>
 </head>
 <body>
     <div id="div1">
-        <div id="div11">title</div>
+        <div id="div11" style="font-weight: bold;">분당 배관망 지도</div>
         <select id="branchs">
             <option value="1" selected>분당</option>
             <option value="2">파주</option>
@@ -109,23 +102,23 @@
         <div id="map"></div>
         <div id="roadview"></div>
     </div>
-</body>
 
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
-<script>
-    var map; // 전역 지도 객체 선언
-    var roadview;
-    var roadviewClient;
-    var roadviewMode = false;
-    var currentMapType = 'roadmap'; // 현재 지도 타입 저장 ('roadmap' | 'skyview')
-    
-    var allPipesData = []; // 파싱된 전체 배관 데이터 저장용 (메모리 로드)
-    var activePolylines = []; // 현재 지도 화면상에 렌더링된 Polyline 객체들
-    var activeOverlays = []; // 화면에 그려진 관경 라벨(CustomOverlay) 저장 배열
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
+    <script>
+        var map;
+        var roadview;
+        var roadviewClient;
+        var roadviewMode = false;
+        var currentMapType = 'roadmap';
 
-    kakao.maps.load(function() { // SDK가 완전히 로드된 후 내부 실행
-        var container = document.getElementById('map'); // 지도를 표시할 HTML 요소
-        // 1. 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
+        var allPipesData = []; 
+        var activePolylines = []; 
+        var activeOverlays = [];
+
+        kakao.maps.load(function() {
+            var container = document.getElementById('map');
+
+            // 1. 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
             var savedLat = localStorage.getItem('last_lat');
             var savedLng = localStorage.getItem('last_lng');
             var savedLevel = localStorage.getItem('last_level');
@@ -141,300 +134,289 @@
                 level: initialLevel
             };
 
-        map = new kakao.maps.Map(container, options); // 지도 생성
+            map = new kakao.maps.Map(container, options);
 
-        var roadviewContainer = document.getElementById('roadview');
-        roadview = new kakao.maps.Roadview(roadviewContainer);
-        roadviewClient = new kakao.maps.RoadviewClient();
+            var roadviewContainer = document.getElementById('roadview');
+            roadview = new kakao.maps.Roadview(roadviewContainer);
+            roadviewClient = new kakao.maps.RoadviewClient();
 
-        // 1. 지도가 이동하거나 확대/축소될 때 화면 범위 안 배관만 다시 그리기
-        kakao.maps.event.addListener(map, 'idle', function() {
-            saveCurrentLocation();
-            updateVisiblePipes();
-        });
-
-        // 지도 클릭 이벤트
-        kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-            if (!roadviewMode) return; // 거리뷰 버튼을 누른 상태가 아니면 무시
-
-            var position = mouseEvent.latLng;
-            openRoadview(position);
-        });
-
-        // 깃허브 저장소의 bundang/pipe.csv 파일 읽기
-        loadCsvPipes('bundang/pipe.csv');
-    });
-
-    // 현재 지도 중심 좌표와 확대 레벨을 브라우저에 저장
-    function saveCurrentLocation() {
-        if (!map) return;
-        var center = map.getCenter();
-        var level = map.getLevel();
-
-        localStorage.setItem('last_lat', center.getLat());
-        localStorage.setItem('last_lng', center.getLng());
-        localStorage.setItem('last_level', level);
-    }
-
-    // 지도에서 배관 삭제
-    function clearPipes() {
-        // 기존 배관선 삭제
-        for (var i = 0; i < activePolylines.length; i++) {
-            activePolylines[i].setMap(null);
-        }
-        activePolylines = [];
-
-        // 기존 관경 라벨 삭제
-        for (var j = 0; j < activeOverlays.length; j++) {
-            activeOverlays[j].setMap(null);
-        }
-        activeOverlays = [];
-    }
-
-    // 1. CSV 파일 읽어오기 (fetch API)
-    function loadCsvPipes(filePath) {
-        clearPipes(); // 기존 배관 지우기
-
-        fetch(filePath)
-            .then(function(response) {
-                if (!response.ok) throw new Error("CSV 파일 로드 실패");
-                return response.text();
-            })
-            .then(function(csvText) {
-                parseCsvData(csvText); // 메모리에 데이터 파싱 저장
-                updateVisiblePipes();  // 현재 화면 범위 배관 표시
-            })
-            .catch(function(error) {
-                console.error("오류 발생:", error);
+            // 2. 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
+            kakao.maps.event.addListener(map, 'idle', function() {
+                saveCurrentLocation();
+                updateVisiblePipes();
             });
-    }
 
-    // 2. CSV 파싱 시 SR_CODE 및 DIA_CODE 함께 저장
-    function parseCsvData(csvText) {
-        var lines = csvText.trim().split('\n');
-        if (lines.length <= 1) return;
+            // 지도 클릭 이벤트 (거리뷰)
+            kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+                if (!roadviewMode) return;
+                openRoadview(mouseEvent.latLng);
+            });
 
-        for (var i = 1; i < lines.length; i++) {
-            var line = lines[i].trim();
-            if (!line) continue;
-
-            var coordStartIndex = line.indexOf('"[');
-            var coordEndIndex = line.lastIndexOf(']"');
-
-            if (coordStartIndex === -1 || coordEndIndex === -1) continue;
-
-            // 따옴표 앞부분 속성 데이터 분리
-            var propertiesPart = line.substring(0, coordStartIndex);
-            var columns = propertiesPart.split(',');
-
-            // SR_CODE (인덱스 1), DIA_CODE (인덱스 3)
-            var srCode = columns[1] ? columns[1].trim() : '';
-            var diaCode = parseInt(columns[3], 10) || 0;
-
-            var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
-
-            try {
-                var rawCoords = JSON.parse(coordString);
-                var linePath = [];
-                
-                var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-
-                for (var j = 0; j < rawCoords.length; j++) {
-                    var lng = rawCoords[j][0];
-                    var lat = rawCoords[j][1];
-                    linePath.push(new kakao.maps.LatLng(lat, lng));
-
-                    if (lat < minLat) minLat = lat;
-                    if (lat > maxLat) maxLat = lat;
-                    if (lng < minLng) minLng = lng;
-                    if (lng > maxLng) maxLng = lng;
-                }
-
-                allPipesData.push({
-                    srCode: srCode,   // 'S' 또는 'R' 저장
-                    diaCode: diaCode,
-                    path: linePath,
-                    bounds: new kakao.maps.LatLngBounds(
-                        new kakao.maps.LatLng(minLat, minLng),
-                        new kakao.maps.LatLng(maxLat, maxLng)
-                    )
-                });
-
-            } catch (e) {
-                console.error(i + "번째 행 좌표 변환 실패:", e);
-            }
-        }
-    }
-
-    function updateVisiblePipes() {
-        if (!map || allPipesData.length === 0) return;
-
-        clearPipes();
-
-        var currentLevel = map.getLevel();
-
-        // 레벨 5 이상일 때는 전체 숨김
-        if (currentLevel >= 5) {
-            return;
-        }
-
-        var mapBounds = map.getBounds();
-
-        for (var i = 0; i < allPipesData.length; i++) {
-            var pipe = allPipesData[i];
-
-            // 레벨 3, 4일 때는 300mm 이상만 표시
-            if (currentLevel >= 3 && pipe.diaCode < 300) {
-                continue;
-            }
-
-            if (mapBounds.intersects(pipe.bounds)) {
-                // 1. SR_CODE별 선 색상 지정
-                var lineColor = '#FF0000'; // 기본 붉은색 ('S')
-                if (pipe.srCode === 'R') {
-                    lineColor = '#FFA500'; // 주황색
-                } else if (pipe.srCode !== 'S') {
-                    lineColor = '#888888';
-                }
-
-                // 2. 배관 선(Polyline) 생성
-                var polyline = new kakao.maps.Polyline({
-                    path: pipe.path,
-                    strokeWeight: 5,
-                    strokeColor: lineColor,
-                    strokeOpacity: 0.85,
-                    strokeStyle: 'solid'
-                });
-
-                polyline.setMap(map);
-                activePolylines.push(polyline);
-
-                // 3. 배관 중앙 좌표 계산 (경로 중간 지점 좌표 사용)
-                var midIndex = Math.floor(pipe.path.length / 2);
-                var centerPosition = pipe.path[midIndex];
-
-                // 4. 관경 라벨 (CustomOverlay) 생성
-                var overlayContent = '<div class="pipe-label">' + pipe.diaCode + 'A</div>';
-
-                var customOverlay = new kakao.maps.CustomOverlay({
-                    position: centerPosition,
-                    content: overlayContent,
-                    xAnchor: 0.5, // 가로 중앙 정렬
-                    yAnchor: 0.5  // 세로 중앙 정렬
-                });
-
-                customOverlay.setMap(map);
-                activeOverlays.push(customOverlay);
-            }
-        }
-    }
-    // 지사 목록 변경 이벤트
-    var select = document.getElementById("branchs"); 
-    select.addEventListener("change", function () {
-        if (this.value === "1") {
-            map.panTo(new kakao.maps.LatLng(37.3797697, 127.1159946));
             loadCsvPipes('bundang/pipe.csv');
-        } else if (this.value === "2") {
+        });
+
+        // 현재 지도 중심 좌표와 확대 레벨을 브라우저에 저장
+        function saveCurrentLocation() {
+            if (!map) return;
+            var center = map.getCenter();
+            var level = map.getLevel();
+
+            localStorage.setItem('last_lat', center.getLat());
+            localStorage.setItem('last_lng', center.getLng());
+            localStorage.setItem('last_level', level);
+        }
+
+        // 화면상 표시 중인 배관 및 라벨 삭제
+        function clearPipes() {
+            for (var i = 0; i < activePolylines.length; i++) {
+                activePolylines[i].setMap(null);
+            }
+            activePolylines = [];
+
+            for (var j = 0; j < activeOverlays.length; j++) {
+                activeOverlays[j].setMap(null);
+            }
+            activeOverlays = [];
+        }
+
+        // 1. CSV 파일 읽어오기
+        function loadCsvPipes(filePath) {
             clearPipes();
             allPipesData = [];
-            alert("파주 배관 데이터가 아직 등록되지 않았습니다.");
-        }
-    });
 
-    // 버튼 하이라이트 상태 업데이트
-    function updateButtonHighlight(activeType) {
-        document.getElementById('mapBtn').classList.remove('active');
-        document.getElementById('skyviewBtn').classList.remove('active');
-        document.getElementById('roadviewBtn').classList.remove('active');
-
-        if (activeType === 'roadmap') {
-            document.getElementById('mapBtn').classList.add('active');
-        } else if (activeType === 'skyview') {
-            document.getElementById('skyviewBtn').classList.add('active');
-        } else if (activeType === 'roadview') {
-            document.getElementById('roadviewBtn').classList.add('active');
-        }
-    }
-
-    // 지도 / 위성 모드 전환 함수
-    function setMapType(maptype) {
-        // 거리뷰가 열려있다면 닫고 지도로 복귀
-        if (document.getElementById('roadview').style.display === 'block') {
-            closeRoadview();
+            fetch(filePath)
+                .then(function(response) {
+                    if (!response.ok) throw new Error("CSV 파일 로드 실패");
+                    return response.text();
+                })
+                .then(function(csvText) {
+                    parseCsvData(csvText);
+                    updateVisiblePipes();
+                })
+                .catch(function(error) {
+                    console.error("오류 발생:", error);
+                });
         }
 
-        if (maptype === 'roadmap') {
-            map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-            currentMapType = 'roadmap';
-        } else if (maptype === 'skyview') {
-            map.setMapTypeId(kakao.maps.MapTypeId.HYBRID); // 위성지도 + 라벨
-            currentMapType = 'skyview';
+        // 2. CSV 파싱 (SR_CODE, DIA_CODE, Coordinates)
+        function parseCsvData(csvText) {
+            var lines = csvText.trim().split('\n');
+            if (lines.length <= 1) return;
+
+            for (var i = 1; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+
+                var coordStartIndex = line.indexOf('"[');
+                var coordEndIndex = line.lastIndexOf(']"');
+
+                if (coordStartIndex === -1 || coordEndIndex === -1) continue;
+
+                var propertiesPart = line.substring(0, coordStartIndex);
+                var columns = propertiesPart.split(',');
+
+                var srCode = columns[1] ? columns[1].trim() : '';
+                var diaCode = parseInt(columns[3], 10) || 0;
+                var pipeGroup = columns[11] ? columns[11].trim() : ''; // PIPE_GROUP 추가
+
+                var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
+
+                try {
+                    var rawCoords = JSON.parse(coordString);
+                    var linePath = [];
+                    var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+
+                    for (var j = 0; j < rawCoords.length; j++) {
+                        var lng = rawCoords[j][0];
+                        var lat = rawCoords[j][1];
+                        linePath.push(new kakao.maps.LatLng(lat, lng));
+
+                        if (lat < minLat) minLat = lat;
+                        if (lat > maxLat) maxLat = lat;
+                        if (lng < minLng) minLng = lng;
+                        if (lng > maxLng) maxLng = lng;
+                    }
+
+                    allPipesData.push({
+                        srCode: srCode,
+                        diaCode: diaCode,
+                        pipeGroup: pipeGroup,
+                        path: linePath,
+                        bounds: new kakao.maps.LatLngBounds(
+                            new kakao.maps.LatLng(minLat, minLng),
+                            new kakao.maps.LatLng(maxLat, maxLng)
+                        )
+                    });
+
+                } catch (e) {
+                    console.error(i + "번째 행 좌표 변환 실패:", e);
+                }
+            }
         }
 
-        resetRoadviewMode();
-        updateButtonHighlight(maptype);
-    }
+        // 3. 레벨/구경 조건 필터링 및 렌더링
+        function updateVisiblePipes() {
+            if (!map || allPipesData.length === 0) return;
 
-    function startRoadviewMode() {
-        roadviewMode = true;
-        map.setCursor('crosshair'); // 카카오맵 전용 API로 커서 변경
-        map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-        updateButtonHighlight('roadview');
-        alert("지도에서 거리뷰를 볼 위치를 선택하세요.");
-    }
-    // 거리뷰 모드 상태 및 커서 스타일 초기화 함수
-    function resetRoadviewMode() {
-        roadviewMode = false;
-        map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);    
-        map.setCursor('grab');
-    }
-    // 거리뷰 닫고 지도로 복귀하기
-    function closeRoadview() {
-        // 1. 로드뷰 숨기기 및 지도 화면 재표시
-        document.getElementById('roadview').style.display = 'none';
-        document.getElementById('map').style.display = 'block';
+            clearPipes();
 
-        // 2. 버튼 상태 복구
-        document.getElementById('mapBtn').style.display = 'block';
-        document.getElementById('skyviewBtn').style.display = 'block';
-        document.getElementById('roadviewBtn').style.display = 'block';
-        document.getElementById('closeRoadviewBtn').style.display = 'none';
+            var currentLevel = map.getLevel();
 
-        // 3. 지도가 렌더링을 다시 하도록 레이아웃 재계산
-        map.relayout();
+            if (currentLevel >= 5) {
+                return;
+            }
 
-        resetRoadviewMode(); // 모드 초기화
-        updateButtonHighlight(currentMapType);
-    }
-    
-    function openRoadview(position) {
-        // 설정한 좌표에서 가장 가까운 로드뷰 파노라마 ID를 찾아 로드뷰를 실행합니다.
-        roadviewClient.getNearestPanoId(position, 50, function(panoId) {
-            if (panoId === null) {
-                alert('이 위치 주변에는 로드뷰를 지원하지 않습니다.');
-                // 로드뷰 실패 시 원래 지도 모드 하이라이트로 복귀
-                resetRoadviewMode();
-                updateButtonHighlight(currentMapType);
-            } else {
-                // 1. 로드뷰 데이터 세팅
-                roadview.setPanoId(panoId, position);
+            var mapBounds = map.getBounds();
+            var labeledGroups = {}; // 이미 라벨을 띄운 PIPE_GROUP 추적용 객체
 
-                // 2. 지도 숨기기 및 로드뷰 화면 전환
-                document.getElementById('map').style.display = 'none';
-                document.getElementById('roadview').style.display = 'block';
+            for (var i = 0; i < allPipesData.length; i++) {
+                var pipe = allPipesData[i];
 
-                // 3. 버튼 텍스트/표시 상태 전환
-                document.getElementById('mapBtn').style.display = 'none';
-                document.getElementById('skyviewBtn').style.display = 'none';
-                document.getElementById('roadviewBtn').style.display = 'none';
-                document.getElementById('closeRoadviewBtn').style.display = 'block';
+                if (currentLevel >= 3 && pipe.diaCode < 300) {
+                    continue;
+                }
 
-                // 4. 로드뷰 화면 크기 레이아웃 재계산
-                roadview.relayout();
+                if (mapBounds.intersects(pipe.bounds)) {
+                    // 1. 배관 선 렌더링 (모든 선은 정상 표시)
+                    var lineColor = '#FF0000';
+                    if (pipe.srCode === 'R') {
+                        lineColor = '#FFA500';
+                    } else if (pipe.srCode !== 'S') {
+                        lineColor = '#888888';
+                    }
 
-                resetRoadviewMode(); // 모드 초기화
+                    var polyline = new kakao.maps.Polyline({
+                        path: pipe.path,
+                        strokeWeight: 5,
+                        strokeColor: lineColor,
+                        strokeOpacity: 0.85,
+                        strokeStyle: 'solid'
+                    });
+
+                    polyline.setMap(map);
+                    activePolylines.push(polyline);
+
+                    // 2. PIPE_GROUP + SR_CODE 조합으로 그룹별 라벨 1회만 표시
+                    // PIPE_GROUP 데이터가 없는 경웨는 diaCode로 대체 처리
+                    var groupKey = pipe.pipeGroup 
+                        ? (pipe.pipeGroup + '_' + pipe.srCode) 
+                        : (pipe.diaCode + '_' + pipe.srCode);
+
+                    if (!labeledGroups[groupKey]) {
+                        var midIndex = Math.floor(pipe.path.length / 2);
+                        var centerPosition = pipe.path[midIndex];
+                        var overlayContent = '<div class="pipe-label">' + pipe.diaCode + 'A</div>';
+
+                        var customOverlay = new kakao.maps.CustomOverlay({
+                            position: centerPosition,
+                            content: overlayContent,
+                            xAnchor: 0.5,
+                            yAnchor: 0.5
+                        });
+
+                        customOverlay.setMap(map);
+                        activeOverlays.push(customOverlay);
+
+                        // 현재 그룹 키 출력 완료 기록
+                        labeledGroups[groupKey] = true;
+                    }
+                }
+            }
+        }
+
+        // 지사 목록 변경 이벤트
+        var select = document.getElementById("branchs"); 
+        select.addEventListener("change", function () {
+            if (this.value === "1") {
+                map.panTo(new kakao.maps.LatLng(37.3797697, 127.1159946));
+                loadCsvPipes('bundang/pipe.csv');
+            } else if (this.value === "2") {
+                clearPipes();
+                allPipesData = [];
+                alert("파주 배관 데이터가 아직 등록되지 않았습니다.");
             }
         });
-    }
-</script>
+
+        // 지도 / 위성 모드 전환
+        function setMapType(maptype) {
+            if (document.getElementById('roadview').style.display === 'block') {
+                closeRoadview();
+            }
+
+            if (maptype === 'roadmap') {
+                map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+                currentMapType = 'roadmap';
+            } else if (maptype === 'skyview') {
+                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
+                currentMapType = 'skyview';
+            }
+
+            resetRoadviewMode();
+            updateButtonHighlight(maptype);
+        }
+
+        function startRoadviewMode() {
+            roadviewMode = true;
+            map.setCursor('crosshair');
+            updateButtonHighlight('roadview');
+            alert("지도에서 거리뷰를 볼 위치를 선택하세요.");
+        }
+
+        function resetRoadviewMode() {
+            roadviewMode = false;
+            map.setCursor('grab');
+        }
+
+        function updateButtonHighlight(activeType) {
+            document.getElementById('mapBtn').classList.remove('active');
+            document.getElementById('skyviewBtn').classList.remove('active');
+            document.getElementById('roadviewBtn').classList.remove('active');
+
+            if (activeType === 'roadmap') {
+                document.getElementById('mapBtn').classList.add('active');
+            } else if (activeType === 'skyview') {
+                document.getElementById('skyviewBtn').classList.add('active');
+            } else if (activeType === 'roadview') {
+                document.getElementById('roadviewBtn').classList.add('active');
+            }
+        }
+
+        function closeRoadview() {
+            document.getElementById('roadview').style.display = 'none';
+            document.getElementById('map').style.display = 'block';
+
+            document.getElementById('mapBtn').style.display = 'block';
+            document.getElementById('skyviewBtn').style.display = 'block';
+            document.getElementById('roadviewBtn').style.display = 'block';
+            document.getElementById('closeRoadviewBtn').style.display = 'none';
+
+            map.relayout();
+            resetRoadviewMode();
+            updateButtonHighlight(currentMapType);
+        }
+        
+        function openRoadview(position) {
+            roadviewClient.getNearestPanoId(position, 50, function(panoId) {
+                if (panoId === null) {
+                    alert('이 위치 주변에는 로드뷰를 지원하지 않습니다.');
+                    resetRoadviewMode();
+                    updateButtonHighlight(currentMapType);
+                } else {
+                    roadview.setPanoId(panoId, position);
+
+                    document.getElementById('map').style.display = 'none';
+                    document.getElementById('roadview').style.display = 'block';
+
+                    document.getElementById('mapBtn').style.display = 'none';
+                    document.getElementById('skyviewBtn').style.display = 'none';
+                    document.getElementById('roadviewBtn').style.display = 'none';
+                    document.getElementById('closeRoadviewBtn').style.display = 'block';
+
+                    roadview.relayout();
+                    resetRoadviewMode();
+                }
+            });
+        }
+    </script>
+</body>
 </html>
