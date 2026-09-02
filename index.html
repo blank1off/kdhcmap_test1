@@ -170,23 +170,6 @@
         // 화면상 표시 중인 배관 및 라벨 삭제
         var activeInfoWindow = null; // 현재 열려있는 팝업 관리용
 
-        function clearPipes() {
-            // 열려있는 팝업 닫기
-            if (activeInfoWindow) {
-                activeInfoWindow.close();
-                activeInfoWindow = null;
-            }
-
-            for (var i = 0; i < activePolylines.length; i++) {
-                activePolylines[i].setMap(null);
-            }
-            activePolylines = [];
-
-            for (var j = 0; j < activeOverlays.length; j++) {
-                activeOverlays[j].setMap(null);
-            }
-            activeOverlays = [];
-        }
 
         // 1. CSV 파일 읽어오기
         function loadCsvPipes(filePath) {
@@ -589,8 +572,10 @@
         }
 
         // 로드뷰 화면에 배관 및 관경 라벨 표시 함수
+        // 로드뷰 화면에 배관 및 관경 라벨 표시 함수
         function updateRoadviewPipes() {
-            if (!roadview || !roadviewMode || allPipesData.length === 0) return;
+            // ★ roadviewMode 검사 제거 (로드뷰 모드가 꺼져도 화면은 로드뷰 상태이므로)
+            if (!roadview || allPipesData.length === 0) return;
 
             clearRvPipes();
 
@@ -600,7 +585,7 @@
             for (var i = 0; i < allPipesData.length; i++) {
                 var pipe = allPipesData[i];
 
-                // 로드뷰 시야 범위 내 배관선 색상 설정 (S: 붉은색, R: 주황색)
+                // 배관선 색상 설정
                 var lineColor = '#FF0000';
                 if (pipe.srCode === 'R') {
                     lineColor = '#FFA500';
@@ -609,14 +594,15 @@
                 }
 
                 // 1. 로드뷰 상에 폴리라인(배관선) 추가
-                var rvPolyline = new kakao.maps.RoadviewOverlay({
+                // ★ kakao.maps.RoadviewOverlay -> kakao.maps.Polyline으로 변경
+                var rvPolyline = new kakao.maps.Polyline({
                     path: pipe.path,
                     strokeWeight: 8,
                     strokeColor: lineColor,
                     strokeOpacity: 0.85
                 });
 
-                rvPolyline.setMap(roadview);
+                rvPolyline.setMap(roadview); // 로드뷰 객체에 직접 표시
                 activeRvPolylines.push(rvPolyline);
 
                 // 2. 로드뷰 상에 관경 라벨 추가
@@ -631,8 +617,7 @@
                     yAnchor: 0.5
                 });
 
-                // CustomOverlay를 지도와 동일하게 로드뷰 객체에 바인딩
-                rvCustomOverlay.setMap(roadview);
+                rvCustomOverlay.setMap(roadview); // 로드뷰 객체에 직접 표시
                 activeRvOverlays.push(rvCustomOverlay);
             }
         }
