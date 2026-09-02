@@ -81,6 +81,34 @@
             white-space: nowrap;
             pointer-events: none;
         }
+        /* 로드뷰 전용 선형 라벨 스타일 */
+        .rv-pipe-line-overlay {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rv-pipe-bar {
+            width: 60px;
+            height: 6px;
+            border-radius: 3px;
+            box-shadow: 0 0 6px rgba(0,0,0,0.5);
+            margin-bottom: 4px;
+        }
+
+        .rv-pipe-badge {
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid #333333;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #111111;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -518,17 +546,13 @@
 
                     roadview.relayout();
 
-                    // ★ 1. 로드뷰 파노라마 변경(init) 완료 후 배관 그리기
-                    kakao.maps.event.addListener(roadview, 'init', function() {
-                        updateRoadviewPipes();
-                    });
+                    // 기존 이벤트 제거 후 등록
+                    kakao.maps.event.removeListener(roadview, 'init', updateRoadviewPipes);
+                    kakao.maps.event.removeListener(roadview, 'position_changed', updateRoadviewPipes);
 
-                    // ★ 2. 로드뷰 내에서 도로를 타고 이동할 때 재갱신
-                    kakao.maps.event.addListener(roadview, 'position_changed', function() {
-                        updateRoadviewPipes();
-                    });
+                    kakao.maps.event.addListener(roadview, 'init', updateRoadviewPipes);
+                    kakao.maps.event.addListener(roadview, 'position_changed', updateRoadviewPipes);
 
-                    // 파노라마 ID 지정 (이 함수가 호출된 후 init 이벤트가 작동함)
                     roadview.setPanoId(panoId, position);
                     resetRoadviewMode();
                 }
@@ -582,43 +606,42 @@
 
             clearRvPipes();
 
-            var rvPosition = roadview.getPosition(); // 현재 로드뷰의 카메라 위치
+            var rvPosition = roadview.getPosition();
             if (!rvPosition) return;
 
             for (var i = 0; i < allPipesData.length; i++) {
                 var pipe = allPipesData[i];
 
                 // 배관선 색상 설정
-                var lineColor = '#FF0000';
+                var barColor = '#FF0000';
                 if (pipe.srCode === 'R') {
-                    lineColor = '#FFA500';
+                    barColor = '#FFA500';
                 } else if (pipe.srCode !== 'S') {
-                    lineColor = '#888888';
+                    barColor = '#888888';
                 }
 
-                // ★ 1. Polyline -> RoadviewPolyline으로 변경 (로드뷰 전용 선 객체)
-                var rvPolyline = new kakao.maps.RoadviewPolyline({
-                    path: pipe.path,
-                    strokeWeight: 8,
-                    strokeColor: lineColor,
-                    strokeOpacity: 0.85
-                });
+                // 배관 경로 상에서 표시할 위치들 선정 (중간 지점)
+                var path = pipe.path;
+                if (!path || path.length === 0) continue;
 
-                rvPolyline.setMap(roadview);
-                activeRvPolylines.push(rvPolyline);
+                var midIndex = Math.floor(path.length / 2);
+                var centerPosition = path[midIndex];
 
-                // 2. 로드뷰 상에 관경 라벨 추가
-                var midIndex = Math.floor(pipe.path.length / 2);
-                var centerPosition = pipe.path[midIndex];
-                var overlayContent = '<div class="pipe-label">' + pipe.diaCode + 'A</div>';
+                // 선 모양(bar)과 관경 뱃지가 합쳐진 HTML 커스텀 오버레이 컨텐츠
+                var overlayContent = 
+                    '<div class="rv-pipe-line-overlay">' +
+                        '<div class="rv-pipe-bar" style="background-color: ' + barColor + ';"></div>' +
+                        '<div class="rv-pipe-badge">' + pipe.diaCode + 'A (' + (pipe.srCode === 'S' ? '공급' : '회수') + ')</div>' +
+                    '</div>';
 
                 var rvCustomOverlay = new kakao.maps.CustomOverlay({
                     position: centerPosition,
                     content: overlayContent,
                     xAnchor: 0.5,
-                    yAnchor: 0.5
+                    yAnchor: 1.0 // 바닥 지점에 맞춤
                 });
 
+                // 로드뷰에 오버레이 올리기
                 rvCustomOverlay.setMap(roadview);
                 activeRvOverlays.push(rvCustomOverlay);
             }
