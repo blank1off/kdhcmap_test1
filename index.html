@@ -240,8 +240,8 @@
 
                     allPipesData.push({
                         srCode: srCode,
-                        diaCode: diaCode,
                         pipeGroup: pipeGroup,
+                        diaCode: diaCode,
                         path: linePath,
                         bounds: new kakao.maps.LatLngBounds(
                             new kakao.maps.LatLng(minLat, minLng),
@@ -255,7 +255,7 @@
             }
         }
 
-        // 3. 레벨/구경 조건 필터링 및 렌더링
+        // 3. 레벨/구경 조건 필터링 및 공간적 연결성(Spatial Connection) 기반 라벨 통합
         function updateVisiblePipes() {
             if (!map || allPipesData.length === 0) return;
 
@@ -263,22 +263,25 @@
 
             var currentLevel = map.getLevel();
 
+            // 레벨 5 이상 비표시
             if (currentLevel >= 5) {
                 return;
             }
 
             var mapBounds = map.getBounds();
-            var labeledGroups = {}; // 이미 라벨을 띄운 PIPE_GROUP 추적용 객체
+            var visiblePipes = []; // 화면 범위 내에 들어오는 배관 모음
 
+            // Step 1. 화면 내 표시 대상 배관 필터링 및 Line 그리기
             for (var i = 0; i < allPipesData.length; i++) {
                 var pipe = allPipesData[i];
 
+                // 레벨 3, 4일 때 구경 300 미만 제외
                 if (currentLevel >= 3 && pipe.diaCode < 300) {
                     continue;
                 }
 
                 if (mapBounds.intersects(pipe.bounds)) {
-                    // 1. 배관 선 렌더링 (모든 선은 정상 표시)
+                    // 배관선 색상 설정 (S: 붉은색, R: 주황색)
                     var lineColor = '#FF0000';
                     if (pipe.srCode === 'R') {
                         lineColor = '#FFA500';
@@ -297,31 +300,98 @@
                     polyline.setMap(map);
                     activePolylines.push(polyline);
 
-                    // 2. PIPE_GROUP + SR_CODE 조합으로 그룹별 라벨 1회만 표시
-                    // PIPE_GROUP 데이터가 없는 경웨는 diaCode로 대체 처리
-                    var groupKey = pipe.pipeGroup 
-                        ? (pipe.pipeGroup + '_' + pipe.srCode) 
-                        : (pipe.diaCode + '_' + pipe.srCode);
+                    // 라벨 연결성 계산을 위해 화면 내부 배관 목록에 추가
+                    visiblePipes.push(pipe);
+                }
+            }
 
-                    if (!labeledGroups[groupKey]) {
-                        var midIndex = Math.floor(pipe.path.length / 2);
-                        var centerPosition = pipe.path[midIndex];
-                        var overlayContent = '<div class="pipe-label">' + pipe.diaCode + 'A</div>';
+            if (visiblePipes.length === 0) return;
 
-                        var customOverlay = new kakao.maps.CustomOverlay({
-                            position: centerPosition,
-                            content: overlayContent,
-                            xAnchor: 0.5,
-                            yAnchor: 0.5
-                        });
+            // Step 2. Union-Find 알고리즘을 이용한 좌표 연결 그룹화
+            var parent = [];
+            for (var k = 0; k < visiblePipes.length; k++) {
+                parent[k] = k;
+            }
 
-                        customOverlay.setMap(map);
-                        activeOverlays.push(customOverlay);
+            function find(i) {
+                if (parent[i] === i) return i;
+                return parent[i] = find(parent[i]);
+            }
 
-                        // 현재 그룹 키 출력 완료 기록
-                        labeledGroups[groupKey] = true;
+            function union(i, j) {
+                var rootI = find(i);
+                var rootJ = find(j);
+                if (rootI !== rootJ) {
+                    parent[rootI] = rootJ;
+                }
+            }
+
+            // 두 좌표 간의 거리가 매우 가까운지(연결되어 있는지) 확인하는 함수
+            function isConnected(path1, path2) {
+                var p1_start = path1[0];
+                var p1_end = path1[path1.length - 1];
+                var p2_start = path2[0];
+                var p2_end = path2[path2.length - 1];
+
+                // 좌표 비교 오차 범위 (약 1m 이내 접촉 여부)
+                var threshold = 0.00005; 
+
+                var checkDist = function(pt1, pt2) {
+                    var dLat = Math.abs(pt1.getLat() - pt2.getLat());
+                    var dLng = Math.abs(pt1.getLng() - pt2.getLng());
+                    return (dLat < threshold && dLng < threshold);
+                };
+
+                return checkDist(p1_start, p2_start) || checkDist(p1_start, p2_end) ||
+                    checkDist(p1_end, p2_start) || checkDist(p1_end, p2_end);
+            }
+
+            // 배관 간 연결 여부 비교 (동일 관경 + 동일 공급/회수 구분 + 좌표 연결)
+            for (var a = 0; a < visiblePipes.length; a++) {
+                for (var b = a + 1; b < visiblePipes.length; b++) {
+                    var pipeA = visiblePipes[a];
+                    var pipeB = visiblePipes[b];
+
+                    if (pipeA.diaCode === pipeB.diaCode && 
+                        pipeA.srCode === pipeB.srCode && 
+                        isConnected(pipeA.path, pipeB.path)) {
+                        union(a, b);
                     }
                 }
+            }
+
+            // Step 3. 그룹별로 대표 배관들을 묶고 각 그룹당 1개의 라벨만 표시
+            var groups = {};
+            for (var m = 0; m < visiblePipes.length; m++) {
+                var root = find(m);
+                if (!groups[root]) {
+                    groups[root] = [];
+                }
+                groups[root].push(visiblePipes[m]);
+            }
+
+            // 각 그룹의 중앙 배관 조각에 관경 라벨 표시
+            for (var rootKey in groups) {
+                var groupPipes = groups[rootKey];
+                
+                // 그룹 내 배관 조각들 중 중간에 위치한 배관 선택
+                var midPipeIndex = Math.floor(groupPipes.length / 2);
+                var targetPipe = groupPipes[midPipeIndex];
+
+                var midCoordIndex = Math.floor(targetPipe.path.length / 2);
+                var centerPosition = targetPipe.path[midCoordIndex];
+
+                var overlayContent = '<div class="pipe-label">' + targetPipe.diaCode + 'A</div>';
+
+                var customOverlay = new kakao.maps.CustomOverlay({
+                    position: centerPosition,
+                    content: overlayContent,
+                    xAnchor: 0.5,
+                    yAnchor: 0.5
+                });
+
+                customOverlay.setMap(map);
+                activeOverlays.push(customOverlay);
             }
         }
 
