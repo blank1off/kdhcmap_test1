@@ -167,7 +167,15 @@
         }
 
         // 화면상 표시 중인 배관 및 라벨 삭제
+        var activeInfoWindow = null; // 현재 열려있는 팝업 관리용
+
         function clearPipes() {
+            // 열려있는 팝업 닫기
+            if (activeInfoWindow) {
+                activeInfoWindow.close();
+                activeInfoWindow = null;
+            }
+
             for (var i = 0; i < activePolylines.length; i++) {
                 activePolylines[i].setMap(null);
             }
@@ -198,7 +206,7 @@
                 });
         }
 
-        // 2. CSV 파싱 (SR_CODE, DIA_CODE, Coordinates)
+        // CSV 파싱 시 상세 정보 컬럼 추출
         function parseCsvData(csvText) {
             var lines = csvText.trim().split('\n');
             if (lines.length <= 1) return;
@@ -215,10 +223,16 @@
                 var propertiesPart = line.substring(0, coordStartIndex);
                 var columns = propertiesPart.split(',');
 
+                // 컬럼 파싱 (CSV 컬럼 순서 기준)
+                var eqpId = columns[0] ? columns[0].trim() : '';
                 var srCode = columns[1] ? columns[1].trim() : '';
-                var pipeGroup = columns[3] ? columns[3].trim() : ''; // PIPE_GROUP 추가
-                var diaCode = parseInt(columns[4], 10) || 0;
-                
+                var cntrwkNm = columns[2] ? columns[2].replace(/^"|"$/g, '').trim() : ''; // 공사명
+                var diaCode = parseInt(columns[3], 10) || 0;
+                var pipePress = columns[4] ? columns[4].trim() : '';
+                var plineLt = columns[5] ? columns[5].trim() : ''; // 연장(m)
+                var competDe = columns[6] ? columns[6].trim() : ''; // 준공일자
+                var qltyGrade = columns[7] ? columns[7].trim() : ''; // 품질등급
+                var avgDph = columns[10] ? columns[10].trim() : ''; // 평균심도
 
                 var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
 
@@ -239,9 +253,15 @@
                     }
 
                     allPipesData.push({
+                        eqpId: eqpId,
                         srCode: srCode,
-                        pipeGroup: pipeGroup,
                         diaCode: diaCode,
+                        cntrwkNm: cntrwkNm,
+                        pipePress: pipePress,
+                        plineLt: plineLt,
+                        competDe: competDe,
+                        qltyGrade: qltyGrade,
+                        avgDph: avgDph,
                         path: linePath,
                         bounds: new kakao.maps.LatLngBounds(
                             new kakao.maps.LatLng(minLat, minLng),
@@ -275,13 +295,11 @@
             for (var i = 0; i < allPipesData.length; i++) {
                 var pipe = allPipesData[i];
 
-                // 레벨 3, 4일 때 구경 300 미만 제외
                 if (currentLevel >= 3 && pipe.diaCode < 300) {
                     continue;
                 }
 
                 if (mapBounds.intersects(pipe.bounds)) {
-                    // 배관선 색상 설정 (S: 붉은색, R: 주황색)
                     var lineColor = '#FF0000';
                     if (pipe.srCode === 'R') {
                         lineColor = '#FFA500';
@@ -291,7 +309,7 @@
 
                     var polyline = new kakao.maps.Polyline({
                         path: pipe.path,
-                        strokeWeight: 5,
+                        strokeWeight: 7, // 클릭이 용이하도록 선 두께를 약간 넓힘
                         strokeColor: lineColor,
                         strokeOpacity: 0.85,
                         strokeStyle: 'solid'
@@ -299,9 +317,42 @@
 
                     polyline.setMap(map);
                     activePolylines.push(polyline);
-
-                    // 라벨 연결성 계산을 위해 화면 내부 배관 목록에 추가
                     visiblePipes.push(pipe);
+
+                    // 배관(Polyline) 클릭 이벤트 바인딩 (클로저 처리)
+                    (function(targetPolyline, targetPipe) {
+                        kakao.maps.event.addListener(targetPolyline, 'click', function(mouseEvent) {
+                            // 기존 열린 팝업이 있으면 닫기
+                            if (activeInfoWindow) {
+                                activeInfoWindow.close();
+                            }
+
+                            var srText = targetPipe.srCode === 'S' ? '공급관(S)' : (targetPipe.srCode === 'R' ? '회수관(R)' : '기타');
+
+                            // 팝업 HTML 컨텐츠
+                            var infoContent = 
+                                '<div style="padding:10px; font-size:12px; width:220px; line-height:1.6; color:#333;">' +
+                                    '<div style="font-weight:bold; font-size:13px; border-bottom:2px solid #2b6cb0; padding-bottom:3px; margin-bottom:6px;">' +
+                                        '배관 상세 정보 (' + targetPipe.diaCode + 'A)' +
+                                    '</div>' +
+                                    '<b>구분:</b> ' + srText + '<br>' +
+                                    '<b>설계압력:</b> ' + (targetPipe.pipePress || '-') + ' bar<br>' +
+                                    '<b>연장:</b> ' + (targetPipe.plineLt || '-') + ' m<br>' +
+                                    '<b>평균심도:</b> ' + (targetPipe.avgDph || '-') + ' m<br>' +
+                                    '<b>준공일자:</b> ' + (targetPipe.competDe || '-') + '<br>' +
+                                    '<b>공사명:</b> ' + (targetPipe.cntrwkNm || '-') +
+                                '</div>';
+
+                            // 클릭한 지점 위치에 인포윈도우 생성
+                            activeInfoWindow = new kakao.maps.InfoWindow({
+                                position: mouseEvent.latLng,
+                                content: infoContent,
+                                removable: true // 닫기(X) 버튼 표시
+                            });
+
+                            activeInfoWindow.open(map);
+                        });
+                    })(polyline, pipe);
                 }
             }
 
