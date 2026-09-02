@@ -135,6 +135,7 @@
             };
 
             map = new kakao.maps.Map(container, options);
+            map.setMinLevel(0); // ★ 지도의 최소 레벨을 0으로 설정하여 더 크게 확대 가능하도록 변경
 
             var roadviewContainer = document.getElementById('roadview');
             roadview = new kakao.maps.Roadview(roadviewContainer);
@@ -516,7 +517,7 @@
             resetRoadviewMode();
             updateButtonHighlight(currentMapType);
         }
-        
+
         function openRoadview(position) {
             roadviewClient.getNearestPanoId(position, 50, function(panoId) {
                 if (panoId === null) {
@@ -535,9 +536,105 @@
                     document.getElementById('closeRoadviewBtn').style.display = 'block';
 
                     roadview.relayout();
+
+                    // ★ 로드뷰 위치 이동 시 배관선 및 라벨 재갱신 이벤트 연결
+                    kakao.maps.event.addListener(roadview, 'position_changed', function() {
+                        updateRoadviewPipes();
+                    });
+
+                    // 로드뷰 열기 직후 배관 렌더링 실행
+                    updateRoadviewPipes();
                     resetRoadviewMode();
                 }
             });
+        }
+        
+
+
+        ///로드뷰 표시 관련
+        var activeRvPolylines = []; // 로드뷰 전용 폴리라인 배열
+        var activeRvOverlays = [];  // 로드뷰 전용 관경 라벨 배열
+
+        function clearPipes() {
+            if (activeInfoWindow) {
+                activeInfoWindow.close();
+                activeInfoWindow = null;
+            }
+
+            // 지도용 데이터 삭제
+            for (var i = 0; i < activePolylines.length; i++) {
+                activePolylines[i].setMap(null);
+            }
+            activePolylines = [];
+
+            for (var j = 0; j < activeOverlays.length; j++) {
+                activeOverlays[j].setMap(null);
+            }
+            activeOverlays = [];
+
+            // 로드뷰용 데이터 삭제
+            clearRvPipes();
+        }
+
+        function clearRvPipes() {
+            for (var i = 0; i < activeRvPolylines.length; i++) {
+                activeRvPolylines[i].setMap(null);
+            }
+            activeRvPolylines = [];
+
+            for (var j = 0; j < activeRvOverlays.length; j++) {
+                activeRvOverlays[j].setMap(null);
+            }
+            activeRvOverlays = [];
+        }
+
+        // 로드뷰 화면에 배관 및 관경 라벨 표시 함수
+        function updateRoadviewPipes() {
+            if (!roadview || !roadviewMode || allPipesData.length === 0) return;
+
+            clearRvPipes();
+
+            var rvPosition = roadview.getPosition(); // 현재 로드뷰의 카메라 위치
+            if (!rvPosition) return;
+
+            for (var i = 0; i < allPipesData.length; i++) {
+                var pipe = allPipesData[i];
+
+                // 로드뷰 시야 범위 내 배관선 색상 설정 (S: 붉은색, R: 주황색)
+                var lineColor = '#FF0000';
+                if (pipe.srCode === 'R') {
+                    lineColor = '#FFA500';
+                } else if (pipe.srCode !== 'S') {
+                    lineColor = '#888888';
+                }
+
+                // 1. 로드뷰 상에 폴리라인(배관선) 추가
+                var rvPolyline = new kakao.maps.RoadviewOverlay({
+                    path: pipe.path,
+                    strokeWeight: 8,
+                    strokeColor: lineColor,
+                    strokeOpacity: 0.85
+                });
+
+                rvPolyline.setMap(roadview);
+                activeRvPolylines.push(rvPolyline);
+
+                // 2. 로드뷰 상에 관경 라벨 추가
+                var midIndex = Math.floor(pipe.path.length / 2);
+                var centerPosition = pipe.path[midIndex];
+                var overlayContent = '<div class="pipe-label">' + pipe.diaCode + 'A</div>';
+
+                var rvCustomOverlay = new kakao.maps.CustomOverlay({
+                    position: centerPosition,
+                    content: overlayContent,
+                    xAnchor: 0.5,
+                    yAnchor: 0.5
+                });
+
+                // CustomOverlay를 지도와 동일하게 로드뷰 객체에 바인딩
+                rvCustomOverlay.setMap(roadview);
+                activeRvOverlays.push(rvCustomOverlay);
+            }
         }
     </script>
 </body>
