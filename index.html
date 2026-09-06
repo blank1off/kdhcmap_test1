@@ -704,6 +704,24 @@ function updateSvgLine() {
                 activeOverlays.push(customOverlay);
             }
         }
+
+        function clearPipes() {
+            if (activeInfoWindow) {
+                activeInfoWindow.close();
+                activeInfoWindow = null;
+            }
+
+            // 지도용 데이터 삭제
+            for (var i = 0; i < activePolylines.length; i++) {
+                activePolylines[i].setMap(null);
+            }
+            activePolylines = [];
+
+            for (var j = 0; j < activeOverlays.length; j++) {
+                activeOverlays[j].setMap(null);
+            }
+            activeOverlays = [];
+        }
     </script>
 </body>
 </html>
