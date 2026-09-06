@@ -121,6 +121,7 @@
 
                 updateVisiblePipes();
             });
+            loadCsvPipes('bundang/pipe.csv');
 
             // 지도 클릭 이벤트 (거리뷰)
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
