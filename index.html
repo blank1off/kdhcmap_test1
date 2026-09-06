@@ -4,26 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>카카오맵 레이아웃</title>
-    
     <style>
-        * { box-sizing: border-box; }
         body {
-            width: 100%;
-            height: 100vh;
             margin: 0;
-            display: grid;
-            grid-template-rows: auto 1fr;
         }
         #div1 {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 5px 10px;
-            z-index: 20;
-        }
-        #div2 {
+            width: 100%;
+            height: 100vh;
             position: relative;
         }
         #bnts {
@@ -33,25 +20,6 @@
             z-index: 10;
             display: flex;
             gap: 5px;
-        }
-        .btn {
-            background-color: #ffffff;
-            color: #333333;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        }
-        .btn:active {
-            background-color: #eeeeee;
-        }
-        .btn.active {
-            background-color: #2b6cb0;
-            color: #ffffff;
-            border-color: #2b6cb0;
         }
         #map {
             position: absolute;
@@ -67,81 +35,53 @@
             z-index: 2;
             display: none;
         }
-
-        /* 배관경 텍스트 라벨 스타일 */
-        .pipe-label {
-            background-color: #ffffff;
-            border: 1px solid #333333;
-            border-radius: 4px;
-            padding: 1px 4px;
-            font-size: 11px;
+        #svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 3;
+            pointer-events: none; /* 클릭 이벤트 투과 */
+        }
+        /* 로드뷰 커스텀 오버레이 스타일 */
+        .rv-custom-overlay {
+            background: #ffffff;
+            border: 2px solid #3388ff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
             font-weight: bold;
-            color: #111111;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            white-space: nowrap;
-            pointer-events: none;
-        }
-        /* 로드뷰 전용 선형 라벨 스타일 */
-        .rv-pipe-line-overlay {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .rv-pipe-bar {
-            width: 60px;
-            height: 6px;
-            border-radius: 3px;
-            box-shadow: 0 0 6px rgba(0,0,0,0.5);
-            margin-bottom: 4px;
-        }
-
-        .rv-pipe-badge {
-            background-color: rgba(255, 255, 255, 0.95);
-            border: 1px solid #333333;
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-size: 11px;
-            font-weight: bold;
-            color: #111111;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            color: #333;
+            box-shadow: 0px 2px 6px rgba(0,0,0,0.3);
             white-space: nowrap;
         }
     </style>
 </head>
 <body>
     <div id="div1">
-        <div id="div11" style="font-weight: bold;">분당 배관망 지도</div>
-        <select id="branchs">
-            <option value="1" selected>분당</option>
-            <option value="2">파주</option>
-        </select>
-    </div>
-    <div id="div2">
         <div id="bnts">
             <button id="mapBtn" class="btn active" onclick="setMapType('roadmap')">지도</button>
             <button id="skyviewBtn" class="btn" onclick="setMapType('skyview')">위성</button>
-            <button id="roadviewBtn" class="btn" onclick="startRoadviewMode()">거리뷰</button>
+            <button id="roadviewBtn" class="btn" onclick="roadview_onf()">거리뷰</button>
             <button id="closeRoadviewBtn" class="btn" onclick="closeRoadview()" style="display: none;">지도로 돌아가기</button>
         </div>
 
         <div id="map"></div>
         <div id="roadview"></div>
+        <svg id="svg">
+            <line id="rv-line" stroke="#3388ff" stroke-width="4" stroke-dasharray="6,6" style="display:none;" />
+        </svg>
     </div>
 
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
     <script>
         var map;
+
         var roadview;
         var roadviewClient;
-        var roadviewMode = false;
-        var currentMapType = 'roadmap';
+        var rvCustomOverlays = []; // 생성된 로드뷰 오버레이 객체들을 관리할 배열
 
-        var allPipesData = []; 
-        var activePolylines = []; 
-        var activeOverlays = [];
+        var roadview_flag = false;
+        var MapType_flag = 'roadmap';
 
         kakao.maps.load(function() {
             var container = document.getElementById('map');
@@ -171,33 +111,328 @@
 
             // 2. 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
             kakao.maps.event.addListener(map, 'idle', function() {
-                saveCurrentLocation();
+                if (!map) return;
+                var center = map.getCenter();
+                var level = map.getLevel();
+
+                localStorage.setItem('last_lat', center.getLat());
+                localStorage.setItem('last_lng', center.getLng());
+                localStorage.setItem('last_level', level);
+
                 updateVisiblePipes();
             });
 
             // 지도 클릭 이벤트 (거리뷰)
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-                if (!roadviewMode) return;
+                if (!roadview_flag) return;
                 openRoadview(mouseEvent.latLng);
             });
-
-            loadCsvPipes('bundang/pipe.csv');
+            //로드뷰 이벤트
+            kakao.maps.event.addListener(roadview, 'viewpoint_changed', requestLineUpdate);
+            kakao.maps.event.addListener(roadview, 'position_changed', requestLineUpdate);
+            kakao.maps.event.addListener(roadview, 'panoid_changed', requestLineUpdate);
         });
 
-        // 현재 지도 중심 좌표와 확대 레벨을 브라우저에 저장
-        function saveCurrentLocation() {
-            if (!map) return;
-            var center = map.getCenter();
-            var level = map.getLevel();
-
-            localStorage.setItem('last_lat', center.getLat());
-            localStorage.setItem('last_lng', center.getLng());
-            localStorage.setItem('last_level', level);
+        // 지도 / 위성 모드 전환
+        function setMapType(maptype) {
+            if (maptype === 'roadmap') {
+                map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+                MapType_flag = 'roadmap';
+            } else if (maptype === 'skyview') {
+                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
+                MapType_flag = 'skyview';
+            }
         }
 
-        // 화면상 표시 중인 배관 및 라벨 삭제
-        var activeInfoWindow = null; // 현재 열려있는 팝업 관리용
+        function roadview_onf() {
+            if (roadview_flag == true){ // 거리뷰 모드 꺼지기
+                roadview_flag = false;
+                map.setCursor('grab');
+                map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+            } else { // 거리뷰 모드 켜지기
+                roadview_flag = true;
+                map.setCursor('crosshair');
+                map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW); //지도 위에 로드뷰 도로 올리기
+            }
+        }
 
+        // 오버레이 및 각도 정보를 관리할 그룹 객체
+var overlayGroup = {
+    overlays: [],
+    bearing: 0 // 첫번째 지점에서 두번째 지점을 바라보는 방위각 (0 ~ 360도)
+};
+function clearOverlayGroup() {
+    for (var i = 0; i < overlayGroup.overlays.length; i++) {
+        overlayGroup.overlays[i].overlay.setMap(null);
+    }
+    overlayGroup.overlays = [];
+    overlayGroup.bearing = 0;
+}
+
+// 두 좌표(LatLng) 사이의 방위각(Bearing: 0~360도) 계산 함수
+function calculateBearing(lat1, lng1, lat2, lng2) {
+    var RAD = Math.PI / 180;
+    var phi1 = lat1 * RAD;
+    var phi2 = lat2 * RAD;
+    var deltaLambda = (lng2 - lng1) * RAD;
+
+    var y = Math.sin(deltaLambda) * Math.cos(phi2);
+    var x = Math.cos(phi1) * Math.sin(phi2) -
+            Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+
+    var theta = Math.atan2(y, x);
+    var bearing = (theta * 180 / Math.PI + 360) % 360;
+    return bearing;
+}
+
+function openRoadview(position) {
+    roadviewClient.getNearestPanoId(position, 50, function(panoId) {
+        if (panoId === null) {
+            alert('이 위치 주변에는 로드뷰를 지원하지 않습니다.');
+            return;
+        }
+
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('roadview').style.display = 'block';
+
+        document.getElementById('mapBtn').style.display = 'none';
+        document.getElementById('skyviewBtn').style.display = 'none';
+        document.getElementById('roadviewBtn').style.display = 'none';
+        document.getElementById('closeRoadviewBtn').style.display = 'block';
+
+        document.getElementById('rv-line').style.display = 'block';
+
+        roadview.relayout();
+        
+        if (!position) return;
+
+        // 기존 오버레이 그룹 초기화
+        clearOverlayGroup();
+
+        var lat = position.getLat();
+        var lng = position.getLng();
+
+        var targets = [
+            { title: "10m 떨어진 위치", pos: new kakao.maps.LatLng(lat + 0.00009, lng) },
+            { title: "100m 떨어진 위치", pos: new kakao.maps.LatLng(lat + 0.0009, lng) }
+        ];
+
+        targets.forEach(function(target, index) {
+            var content = document.createElement('div');
+            content.className = 'rv-custom-overlay';
+            content.id = `overlay-${index}`; 
+            content.innerHTML = target.title;
+
+            var overlay = new kakao.maps.CustomOverlay({
+                position: target.pos,
+                content: content,
+                map: roadview
+            });
+
+            overlayGroup.overlays.push({
+                index: index,
+                overlay: overlay,
+                element: content
+            });
+        });
+
+        // 두 지점 간의 방위각 계산 후 그룹에 저장
+        var pos1 = targets[0].pos;
+        var pos2 = targets[1].pos;
+        overlayGroup.bearing = calculateBearing(
+            pos1.getLat(), pos1.getLng(),
+            pos2.getLat(), pos2.getLng()
+        );
+
+        roadview.setPanoId(panoId, position);
+    });
+}
+function closeRoadview() {
+    document.getElementById('roadview').style.display = 'none';
+    document.getElementById('map').style.display = 'block';
+
+    document.getElementById('mapBtn').style.display = 'block';
+    document.getElementById('skyviewBtn').style.display = 'block';
+    document.getElementById('roadviewBtn').style.display = 'block';
+    document.getElementById('closeRoadviewBtn').style.display = 'none';
+
+    document.getElementById('rv-line').style.display = 'none';
+
+    clearOverlayGroup();
+    map.relayout();
+}
+var lineUpdateRequested = false;
+function requestLineUpdate() {
+    if (lineUpdateRequested) return;
+    lineUpdateRequested = true;
+
+    requestAnimationFrame(function() {
+        updateSvgLine();
+        lineUpdateRequested = false;
+    });
+}
+
+// DOM 요소가 뷰포트(화면) 내부 영역에 실제 보이는지 검증 함수
+function isElementVisible(rect, svgRect) {
+    return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.right >= svgRect.left &&
+        rect.left <= svgRect.right &&
+        rect.bottom >= svgRect.top &&
+        rect.top <= svgRect.bottom
+    );
+}
+
+// 화면 중심점을 지나 화면 바깥 경계선과의 교점을 구하는 레이캐스팅 함수
+// 로드뷰 화면 경계선과의 교점(Ray-bounds intersection) 계산
+// 3D 방위각 차이를 기반으로 화면 상의 2D 방향 벡터(dx, dy)를 구하고 화면 테두리와의 교점 계산
+function getRayIntersectionWithBounds(originX, originY, dirPanDegree, dirTiltDegree, focalLength, width, height) {
+    // 1. 각도를 라디안으로 변환
+    var radPan = dirPanDegree * (Math.PI / 180);
+    var radTilt = dirTiltDegree * (Math.PI / 180);
+
+    // 2. 3D 공간 상의 구면 좌표계 방향 벡터 계산
+    // X: 오른쪽(+), Y: 위(+), Z: 앞(+)
+    var vX = Math.sin(radPan);
+    var vY = Math.sin(radTilt);
+    var vZ = Math.cos(radPan);
+
+    // 3. 카메라 투영 평면(2D 화면) 상의 방향 벡터 (dx: 오른쪽, dy: 아래쪽)
+    // vZ가 0 이하(카메라 측면/뒤쪽)여도 시각적 연속성을 위해 평면 투영 벡터 유지
+    var dx = vX * focalLength;
+    var dy = -vY * focalLength; // 화면 좌표계는 아래쪽이 +Y
+
+    // 부호 반전 방지: pan 각도가 오른쪽(+90도)이면 dx는 무조건 양수, 왼쪽(-90도)이면 무조건 음수 보장
+    if (dirPanDegree > 0 && dx < 0) dx = -dx;
+    if (dirPanDegree < 0 && dx > 0) dx = -dx;
+
+    // 벡터 정규화 (단위 벡터화)
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return { x: originX, y: originY };
+    dx /= len;
+    dy /= len;
+
+    // 4. 화면 경계선(테두리)과의 교점 계산 (Ray-AABB Intersection)
+    var tCandidates = [];
+
+    if (dx > 0) tCandidates.push((width - originX) / dx);
+    else if (dx < 0) tCandidates.push((-originX) / dx);
+
+    if (dy > 0) tCandidates.push((height - originY) / dy);
+    else if (dy < 0) tCandidates.push((-originY) / dy);
+
+    // 양수 t 값(진행 방향) 중 가장 먼저 만나는 테두리 선택
+    var validT = tCandidates.filter(function(t) { return t > 0; });
+    var minT = (validT.length > 0) ? Math.min.apply(null, validT) : 0;
+
+    return {
+        x: originX + dx * minT,
+        y: originY + dy * minT
+    };
+}
+
+function updateSvgLine() {
+    var line = document.getElementById('rv-line');
+    var svg = document.getElementById('svg');
+
+    if (!overlayGroup || overlayGroup.overlays.length < 2) {
+        line.style.display = 'none';
+        return;
+    }
+
+    var projection = roadview.getProjection();
+    if (!projection) {
+        line.style.display = 'none';
+        return;
+    }
+
+    var svgRect = svg.getBoundingClientRect();
+    var curVp = roadview.getViewpoint();
+    var rvContainer = document.getElementById('roadview');
+    var width = rvContainer.clientWidth;
+    var height = rvContainer.clientHeight;
+
+    var hFovDegree = 66.4 / Math.pow(1.5, curVp.zoom); 
+    var focalLength = (width / 2) / Math.tan((hFovDegree * Math.PI / 180) / 2);
+
+    var overlayData = overlayGroup.overlays.map(function(item) {
+        var rect = item.element.getBoundingClientRect();
+        var pos = item.overlay.getPosition();
+        var vp = projection.viewpointFromCoords(pos, 0);
+
+        var isVisible = isElementVisible(rect, svgRect);
+        
+        var deltaPan = vp ? (vp.pan - curVp.pan) : 0;
+        while (deltaPan > 180) deltaPan -= 360;
+        while (deltaPan < -180) deltaPan += 360;
+
+        var deltaTilt = vp ? (vp.tilt - curVp.tilt) : 0;
+
+        return {
+            index: item.index,
+            isVisible: isVisible,
+            x: rect.left - svgRect.left + rect.width / 2,
+            y: rect.top - svgRect.top + rect.height / 2,
+            deltaPan: deltaPan,
+            deltaTilt: deltaTilt
+        };
+    });
+
+    var visibleOverlays = overlayData.filter(function(d) { return d.isVisible; });
+
+    // 1. 둘 다 안 보이면 선을 그리지 않음
+    if (visibleOverlays.length === 0) {
+        line.style.display = 'none';
+        return;
+    }
+
+    // 2. 둘 다 보이는 경우: 두 오버레이 중심점 직접 연결
+    if (visibleOverlays.length === 2) {
+        line.setAttribute('x1', visibleOverlays[0].x);
+        line.setAttribute('y1', visibleOverlays[0].y);
+        line.setAttribute('x2', visibleOverlays[1].x);
+        line.setAttribute('y2', visibleOverlays[1].y);
+        line.style.display = 'block';
+        return;
+    }
+
+    // 3. 1개만 보이는 경우: 보이는 지점에서 안 보이는 지점 방향으로 연장선 생성
+    if (visibleOverlays.length === 1) {
+        var visibleObj = visibleOverlays[0];
+        var hiddenObj = overlayData.find(function(d) { return !d.isVisible; });
+
+        // 보이는 점 기준 -> 안 보이는 점 방향 각도 차이
+        var dirPan = hiddenObj.deltaPan - visibleObj.deltaPan;
+        while (dirPan > 180) dirPan -= 360;
+        while (dirPan < -180) dirPan += 360;
+
+        var dirTilt = hiddenObj.deltaTilt - visibleObj.deltaTilt;
+
+        // 화면 테두리와의 정확한 교점 계산
+        var edgePoint = getRayIntersectionWithBounds(
+            visibleObj.x,
+            visibleObj.y,
+            dirPan,
+            dirTilt,
+            focalLength,
+            width,
+            height
+        );
+
+        line.setAttribute('x1', visibleObj.x);
+        line.setAttribute('y1', visibleObj.y);
+        line.setAttribute('x2', edgePoint.x);
+        line.setAttribute('y2', edgePoint.y);
+        line.style.display = 'block';
+    }
+}
+
+        // 배관 그리기
+        var allPipesData = []; 
+        var activePolylines = []; 
+        var activeOverlays = [];
+        var activeInfoWindow = null; // 현재 열려있는 팝업 관리용
 
         // 1. CSV 파일 읽어오기
         function loadCsvPipes(filePath) {
@@ -217,7 +452,6 @@
                     console.error("오류 발생:", error);
                 });
         }
-
         // CSV 파싱 시 상세 정보 컬럼 추출
         function parseCsvData(csvText) {
             var lines = csvText.trim().split('\n');
@@ -286,7 +520,7 @@
                 }
             }
         }
-
+        
         // 3. 레벨/구경 조건 필터링 및 공간적 연결성(Spatial Connection) 기반 라벨 통합
         function updateVisiblePipes() {
             if (!map || allPipesData.length === 0) return;
@@ -455,195 +689,6 @@
 
                 customOverlay.setMap(map);
                 activeOverlays.push(customOverlay);
-            }
-        }
-
-        // 지사 목록 변경 이벤트
-        var select = document.getElementById("branchs"); 
-        select.addEventListener("change", function () {
-            if (this.value === "1") {
-                map.panTo(new kakao.maps.LatLng(37.3797697, 127.1159946));
-                loadCsvPipes('bundang/pipe.csv');
-            } else if (this.value === "2") {
-                clearPipes();
-                allPipesData = [];
-                alert("파주 배관 데이터가 아직 등록되지 않았습니다.");
-            }
-        });
-
-        // 지도 / 위성 모드 전환
-        function setMapType(maptype) {
-            if (document.getElementById('roadview').style.display === 'block') {
-                closeRoadview();
-            }
-
-            if (maptype === 'roadmap') {
-                map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-                currentMapType = 'roadmap';
-            } else if (maptype === 'skyview') {
-                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
-                currentMapType = 'skyview';
-            }
-
-            resetRoadviewMode();
-            updateButtonHighlight(maptype);
-        }
-
-        function startRoadviewMode() {
-            roadviewMode = true;
-            map.setCursor('crosshair');
-            updateButtonHighlight('roadview');
-            alert("지도에서 거리뷰를 볼 위치를 선택하세요.");
-        }
-
-        function resetRoadviewMode() {
-            roadviewMode = false;
-            map.setCursor('grab');
-        }
-
-        function updateButtonHighlight(activeType) {
-            document.getElementById('mapBtn').classList.remove('active');
-            document.getElementById('skyviewBtn').classList.remove('active');
-            document.getElementById('roadviewBtn').classList.remove('active');
-
-            if (activeType === 'roadmap') {
-                document.getElementById('mapBtn').classList.add('active');
-            } else if (activeType === 'skyview') {
-                document.getElementById('skyviewBtn').classList.add('active');
-            } else if (activeType === 'roadview') {
-                document.getElementById('roadviewBtn').classList.add('active');
-            }
-        }
-
-        function closeRoadview() {
-            document.getElementById('roadview').style.display = 'none';
-            document.getElementById('map').style.display = 'block';
-
-            document.getElementById('mapBtn').style.display = 'block';
-            document.getElementById('skyviewBtn').style.display = 'block';
-            document.getElementById('roadviewBtn').style.display = 'block';
-            document.getElementById('closeRoadviewBtn').style.display = 'none';
-
-            map.relayout();
-            resetRoadviewMode();
-            updateButtonHighlight(currentMapType);
-        }
-
-        function openRoadview(position) {
-            roadviewClient.getNearestPanoId(position, 50, function(panoId) {
-                if (panoId === null) {
-                    alert('이 위치 주변에는 로드뷰를 지원하지 않습니다.');
-                    resetRoadviewMode();
-                    updateButtonHighlight(currentMapType);
-                } else {
-                    document.getElementById('map').style.display = 'none';
-                    document.getElementById('roadview').style.display = 'block';
-
-                    document.getElementById('mapBtn').style.display = 'none';
-                    document.getElementById('skyviewBtn').style.display = 'none';
-                    document.getElementById('roadviewBtn').style.display = 'none';
-                    document.getElementById('closeRoadviewBtn').style.display = 'block';
-
-                    roadview.relayout();
-
-                    // 기존 이벤트 제거 후 등록
-                    kakao.maps.event.removeListener(roadview, 'init', updateRoadviewPipes);
-                    kakao.maps.event.removeListener(roadview, 'position_changed', updateRoadviewPipes);
-
-                    kakao.maps.event.addListener(roadview, 'init', updateRoadviewPipes);
-                    kakao.maps.event.addListener(roadview, 'position_changed', updateRoadviewPipes);
-
-                    roadview.setPanoId(panoId, position);
-                    resetRoadviewMode();
-                }
-            });
-        }
-        
-
-
-        ///로드뷰 표시 관련
-        var activeRvPolylines = []; // 로드뷰 전용 폴리라인 배열
-        var activeRvOverlays = [];  // 로드뷰 전용 관경 라벨 배열
-
-        function clearPipes() {
-            if (activeInfoWindow) {
-                activeInfoWindow.close();
-                activeInfoWindow = null;
-            }
-
-            // 지도용 데이터 삭제
-            for (var i = 0; i < activePolylines.length; i++) {
-                activePolylines[i].setMap(null);
-            }
-            activePolylines = [];
-
-            for (var j = 0; j < activeOverlays.length; j++) {
-                activeOverlays[j].setMap(null);
-            }
-            activeOverlays = [];
-
-            // 로드뷰용 데이터 삭제
-            clearRvPipes();
-        }
-
-        function clearRvPipes() {
-            for (var i = 0; i < activeRvPolylines.length; i++) {
-                activeRvPolylines[i].setMap(null);
-            }
-            activeRvPolylines = [];
-
-            for (var j = 0; j < activeRvOverlays.length; j++) {
-                activeRvOverlays[j].setMap(null);
-            }
-            activeRvOverlays = [];
-        }
-
-        // 로드뷰 화면에 배관 및 관경 라벨 표시 함수
-        // 로드뷰 화면에 배관 및 관경 라벨 표시 함수
-        // 로드뷰 화면에 배관 및 관경 라벨 표시 함수
-        function updateRoadviewPipes() {
-            if (!roadview || allPipesData.length === 0) return;
-
-            clearRvPipes();
-
-            var rvPosition = roadview.getPosition();
-            if (!rvPosition) return;
-
-            for (var i = 0; i < allPipesData.length; i++) {
-                var pipe = allPipesData[i];
-
-                // 배관선 색상 설정
-                var barColor = '#FF0000';
-                if (pipe.srCode === 'R') {
-                    barColor = '#FFA500';
-                } else if (pipe.srCode !== 'S') {
-                    barColor = '#888888';
-                }
-
-                // 배관 경로 상에서 표시할 위치들 선정 (중간 지점)
-                var path = pipe.path;
-                if (!path || path.length === 0) continue;
-
-                var midIndex = Math.floor(path.length / 2);
-                var centerPosition = path[midIndex];
-
-                // 선 모양(bar)과 관경 뱃지가 합쳐진 HTML 커스텀 오버레이 컨텐츠
-                var overlayContent = 
-                    '<div class="rv-pipe-line-overlay">' +
-                        '<div class="rv-pipe-bar" style="background-color: ' + barColor + ';"></div>' +
-                        '<div class="rv-pipe-badge">' + pipe.diaCode + 'A (' + (pipe.srCode === 'S' ? '공급' : '회수') + ')</div>' +
-                    '</div>';
-
-                var rvCustomOverlay = new kakao.maps.CustomOverlay({
-                    position: centerPosition,
-                    content: overlayContent,
-                    xAnchor: 0.5,
-                    yAnchor: 1.0 // 바닥 지점에 맞춤
-                });
-
-                // 로드뷰에 오버레이 올리기
-                rvCustomOverlay.setMap(roadview);
-                activeRvOverlays.push(rvCustomOverlay);
             }
         }
     </script>
