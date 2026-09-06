@@ -174,14 +174,34 @@ var overlayGroup = {
     overlays: [],
     bearing: 0 // 첫번째 지점에서 두번째 지점을 바라보는 방위각 (0 ~ 360도)
 };
-function clearOverlayGroup() {
-    for (var i = 0; i < overlayGroup.overlays.length; i++) {
-        overlayGroup.overlays[i].overlay.setMap(null);
-    }
-    overlayGroup.overlays = [];
-    overlayGroup.bearing = 0;
+
+// 두 좌표 간의 직선 거리(m) 계산 함수 (Haversine Formula)
+function getDistanceMeter(lat1, lng1, lat2, lng2) {
+    var R = 6371000; // 지구 반지름 (m)
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
 
+// 오버레이 및 그룹 정보 배열 (여러 개의 배관 그룹 관리)
+var pipeOverlayGroups = [];
+
+function clearOverlayGroup() {
+    pipeOverlayGroups.forEach(function(group) {
+        group.overlays.forEach(function(item) {
+            item.overlay.setMap(null);
+        });
+    });
+    pipeOverlayGroups = [];
+
+    // SVG 라인 레이어 내부 동적 생성 라인 제거
+    var svg = document.getElementById('svg');
+    svg.innerHTML = '';
+}
 // 두 좌표(LatLng) 사이의 방위각(Bearing: 0~360도) 계산 함수
 function calculateBearing(lat1, lng1, lat2, lng2) {
     var RAD = Math.PI / 180;
@@ -213,49 +233,79 @@ function openRoadview(position) {
         document.getElementById('roadviewBtn').style.display = 'none';
         document.getElementById('closeRoadviewBtn').style.display = 'block';
 
-        document.getElementById('rv-line').style.display = 'block';
-
         roadview.relayout();
-        
         if (!position) return;
 
-        // 기존 오버레이 그룹 초기화
+        // 기존 오버레이 및 라인 초기화
         clearOverlayGroup();
 
-        var lat = position.getLat();
-        var lng = position.getLng();
+        var rvLat = position.getLat();
+        var rvLng = position.getLng();
 
-        var targets = [
-            { title: "10m 떨어진 위치", pos: new kakao.maps.LatLng(lat + 0.00009, lng) },
-            { title: "100m 떨어진 위치", pos: new kakao.maps.LatLng(lat + 0.0009, lng) }
-        ];
+        // 1. 전체 배관 중 클릭한 위치에서 100m 이내에 속한 배관 필터링
+        var targetPipes = allPipesData.filter(function(pipe) {
+            if (!pipe.path || pipe.path.length < 2) return false;
 
-        targets.forEach(function(target, index) {
-            var content = document.createElement('div');
-            content.className = 'rv-custom-overlay';
-            content.id = `overlay-${index}`; 
-            content.innerHTML = target.title;
-
-            var overlay = new kakao.maps.CustomOverlay({
-                position: target.pos,
-                content: content,
-                map: roadview
-            });
-
-            overlayGroup.overlays.push({
-                index: index,
-                overlay: overlay,
-                element: content
+            // 배관의 좌표들 중 하나라도 클릭 위치 기준 100m 이내에 있는지 검사
+            return pipe.path.some(function(pt) {
+                var dist = getDistanceMeter(rvLat, rvLng, pt.getLat(), pt.getLng());
+                return dist <= 100;
             });
         });
 
-        // 두 지점 간의 방위각 계산 후 그룹에 저장
-        var pos1 = targets[0].pos;
-        var pos2 = targets[1].pos;
-        overlayGroup.bearing = calculateBearing(
-            pos1.getLat(), pos1.getLng(),
-            pos2.getLat(), pos2.getLng()
-        );
+        if (targetPipes.length === 0) {
+            console.log('100m 이내에 위치한 배관이 없습니다.');
+        }
+
+        // 2. 검색된 배관별로 시작점/끝점 오버레이 및 라인 요소 세트 생성
+        var svg = document.getElementById('svg');
+
+        targetPipes.forEach(function(pipe, pIdx) {
+            var startPos = pipe.path[0];
+            var endPos = pipe.path[pipe.path.length - 1];
+
+            var lineId = `rv-line-${pIdx}`;
+            
+            // 배관별 SVG 선 요소 동적 추가
+            var lineElem = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            lineElem.setAttribute('id', lineId);
+            lineElem.setAttribute('stroke', pipe.srCode === 'R' ? '#FFA500' : '#FF0000');
+            lineElem.setAttribute('stroke-width', '4');
+            lineElem.setAttribute('stroke-dasharray', '6,6');
+            lineElem.style.display = 'none';
+            svg.appendChild(lineElem);
+
+            var targets = [
+                { title: `${pipe.diaCode}A 시작`, pos: startPos },
+                { title: `${pipe.diaCode}A 끝`, pos: endPos }
+            ];
+
+            var groupOverlays = [];
+
+            targets.forEach(function(target, index) {
+                var content = document.createElement('div');
+                content.className = 'rv-custom-overlay';
+                content.innerHTML = target.title;
+
+                var overlay = new kakao.maps.CustomOverlay({
+                    position: target.pos,
+                    content: content,
+                    map: roadview
+                });
+
+                groupOverlays.push({
+                    index: index,
+                    overlay: overlay,
+                    element: content
+                });
+            });
+
+            pipeOverlayGroups.push({
+                pipeId: pipe.eqpId || pIdx,
+                lineId: lineId,
+                overlays: groupOverlays
+            });
+        });
 
         roadview.setPanoId(panoId, position);
     });
@@ -346,19 +396,14 @@ function getRayIntersectionWithBounds(originX, originY, dirPanDegree, dirTiltDeg
 }
 
 function updateSvgLine() {
-    var line = document.getElementById('rv-line');
     var svg = document.getElementById('svg');
 
-    if (!overlayGroup || overlayGroup.overlays.length < 2) {
-        line.style.display = 'none';
+    if (!pipeOverlayGroups || pipeOverlayGroups.length === 0) {
         return;
     }
 
     var projection = roadview.getProjection();
-    if (!projection) {
-        line.style.display = 'none';
-        return;
-    }
+    if (!projection) return;
 
     var svgRect = svg.getBoundingClientRect();
     var curVp = roadview.getViewpoint();
@@ -366,79 +411,83 @@ function updateSvgLine() {
     var width = rvContainer.clientWidth;
     var height = rvContainer.clientHeight;
 
-    var hFovDegree = 66.4 / Math.pow(1.5, curVp.zoom); 
+    var hFovDegree = 66.4 / Math.pow(1.5, curVp.zoom);
     var focalLength = (width / 2) / Math.tan((hFovDegree * Math.PI / 180) / 2);
 
-    var overlayData = overlayGroup.overlays.map(function(item) {
-        var rect = item.element.getBoundingClientRect();
-        var pos = item.overlay.getPosition();
-        var vp = projection.viewpointFromCoords(pos, 0);
+    // 저장된 모든 배관 오버레이 그룹별로 계산 및 라인 갱신
+    pipeOverlayGroups.forEach(function(group) {
+        var line = document.getElementById(group.lineId);
+        if (!line) return;
 
-        var isVisible = isElementVisible(rect, svgRect);
-        
-        var deltaPan = vp ? (vp.pan - curVp.pan) : 0;
-        while (deltaPan > 180) deltaPan -= 360;
-        while (deltaPan < -180) deltaPan += 360;
+        var overlayData = group.overlays.map(function(item) {
+            var rect = item.element.getBoundingClientRect();
+            var pos = item.overlay.getPosition();
+            var vp = projection.viewpointFromCoords(pos, 0);
 
-        var deltaTilt = vp ? (vp.tilt - curVp.tilt) : 0;
+            var isVisible = isElementVisible(rect, svgRect);
 
-        return {
-            index: item.index,
-            isVisible: isVisible,
-            x: rect.left - svgRect.left + rect.width / 2,
-            y: rect.top - svgRect.top + rect.height / 2,
-            deltaPan: deltaPan,
-            deltaTilt: deltaTilt
-        };
+            var deltaPan = vp ? (vp.pan - curVp.pan) : 0;
+            while (deltaPan > 180) deltaPan -= 360;
+            while (deltaPan < -180) deltaPan += 360;
+
+            var deltaTilt = vp ? (vp.tilt - curVp.tilt) : 0;
+
+            return {
+                index: item.index,
+                isVisible: isVisible,
+                x: rect.left - svgRect.left + rect.width / 2,
+                y: rect.top - svgRect.top + rect.height / 2,
+                deltaPan: deltaPan,
+                deltaTilt: deltaTilt
+            };
+        });
+
+        var visibleOverlays = overlayData.filter(function(d) { return d.isVisible; });
+
+        // 1. 두 오버레이 모두 안 보이면 숨김
+        if (visibleOverlays.length === 0) {
+            line.style.display = 'none';
+            return;
+        }
+
+        // 2. 둘 다 보이는 경우
+        if (visibleOverlays.length === 2) {
+            line.setAttribute('x1', visibleOverlays[0].x);
+            line.setAttribute('y1', visibleOverlays[0].y);
+            line.setAttribute('x2', visibleOverlays[1].x);
+            line.setAttribute('y2', visibleOverlays[1].y);
+            line.style.display = 'block';
+            return;
+        }
+
+        // 3. 1개만 보이는 경우: 화면 밖 경계까지 선 그리기
+        if (visibleOverlays.length === 1) {
+            var visibleObj = visibleOverlays[0];
+            var hiddenObj = overlayData.find(function(d) { return !d.isVisible; });
+
+            var dirPan = hiddenObj.deltaPan - visibleObj.deltaPan;
+            while (dirPan > 180) dirPan -= 360;
+            while (dirPan < -180) dirPan += 360;
+
+            var dirTilt = hiddenObj.deltaTilt - visibleObj.deltaTilt;
+
+            var edgePoint = getRayIntersectionWithBounds(
+                visibleObj.x,
+                visibleObj.y,
+                dirPan,
+                dirTilt,
+                focalLength,
+                width,
+                height
+            );
+
+            line.setAttribute('x1', visibleObj.x);
+            line.setAttribute('y1', visibleObj.y);
+            line.setAttribute('x2', edgePoint.x);
+            line.setAttribute('y2', edgePoint.y);
+            line.style.display = 'block';
+        }
     });
-
-    var visibleOverlays = overlayData.filter(function(d) { return d.isVisible; });
-
-    // 1. 둘 다 안 보이면 선을 그리지 않음
-    if (visibleOverlays.length === 0) {
-        line.style.display = 'none';
-        return;
-    }
-
-    // 2. 둘 다 보이는 경우: 두 오버레이 중심점 직접 연결
-    if (visibleOverlays.length === 2) {
-        line.setAttribute('x1', visibleOverlays[0].x);
-        line.setAttribute('y1', visibleOverlays[0].y);
-        line.setAttribute('x2', visibleOverlays[1].x);
-        line.setAttribute('y2', visibleOverlays[1].y);
-        line.style.display = 'block';
-        return;
-    }
-
-    // 3. 1개만 보이는 경우: 보이는 지점에서 안 보이는 지점 방향으로 연장선 생성
-    if (visibleOverlays.length === 1) {
-        var visibleObj = visibleOverlays[0];
-        var hiddenObj = overlayData.find(function(d) { return !d.isVisible; });
-
-        // 보이는 점 기준 -> 안 보이는 점 방향 각도 차이
-        var dirPan = hiddenObj.deltaPan - visibleObj.deltaPan;
-        while (dirPan > 180) dirPan -= 360;
-        while (dirPan < -180) dirPan += 360;
-
-        var dirTilt = hiddenObj.deltaTilt - visibleObj.deltaTilt;
-
-        // 화면 테두리와의 정확한 교점 계산
-        var edgePoint = getRayIntersectionWithBounds(
-            visibleObj.x,
-            visibleObj.y,
-            dirPan,
-            dirTilt,
-            focalLength,
-            width,
-            height
-        );
-
-        line.setAttribute('x1', visibleObj.x);
-        line.setAttribute('y1', visibleObj.y);
-        line.setAttribute('x2', edgePoint.x);
-        line.setAttribute('y2', edgePoint.y);
-        line.style.display = 'block';
-    }
 }
 
         // 배관 그리기
