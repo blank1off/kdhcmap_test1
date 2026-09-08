@@ -250,10 +250,6 @@
                 for (var i = 0; i < Pipes_data.length; i++) {
                     var pipe = Pipes_data[i];
 
-                    //if (currentLevel >= 3 && pipe.diaCode < 300) {
-                    //    continue;
-                    //}
-
                     if (mapBounds.intersects(pipe.bounds)) {
                         var lineColor = '#FF0000';
                         if (pipe.srCode === 'R') lineColor = '#FFA500';
@@ -261,7 +257,7 @@
 
                         var polyline = new kakao.maps.Polyline({
                             path: pipe.path,
-                            strokeWeight: 3, // 클릭이 용이하도록 선 두께를 약간 넓힘
+                            strokeWeight: 1, // 클릭이 용이하도록 선 두께를 약간 넓힘
                             strokeColor: lineColor,
                             strokeStyle: 'solid'
                         });
@@ -282,13 +278,13 @@
                                 var infoContent = 
                                     '<div style="padding:10px; font-size:12px; width:220px; line-height:1.6; color:#333;">' +
                                         '<div style="font-weight:bold; font-size:13px; border-bottom:2px solid #2b6cb0; padding-bottom:3px; margin-bottom:6px;">' +
-                                            '배관 상세 정보 (' + targetPipe.diaCode + 'A)' +
+                                            '배관 상세 정보 (' + targetPipe.eqpId + ')' +
                                         '</div>' +
-                                        '<b>구분:</b> ' + srText + '<br>' +
-                                        '<b>설계압력:</b> ' + (targetPipe.pipePress || '-') + ' bar<br>' +
-                                        '<b>연장:</b> ' + (targetPipe.plineLt || '-') + ' m<br>' +
-                                        '<b>평균심도:</b> ' + (targetPipe.avgDph || '-') + ' m<br>' +
-                                        '<b>준공일자:</b> ' + (targetPipe.competDe || '-') + '<br>' +
+                                        '<b>구분:</b> ' + srText + '-' + (targetPipe.pipePress || '-') + 'bar<br>' +
+                                        '<b>관경:</b> ' + (targetPipe.diaCode || '-') + 'A'+ '<br>' +
+                                        '<b>길이:</b> ' + (targetPipe.plineLt || '-') + ' m<br>' +
+                                        '<b>심도:</b> ' + (targetPipe.avgDph || '-') + ' m<br>' +
+                                        '<b>설치일:</b> ' + (targetPipe.competDe || '-') + '<br>' +
                                         '<b>공사명:</b> ' + (targetPipe.cntrwkNm || '-') +
                                     '</div>';
 
@@ -304,7 +300,96 @@
                         })(polyline, pipe);
                     }
                 }
+
+                if (visiblePipes.length === 0) return;
+
+            // Step 2. Union-Find 알고리즘을 이용한 좌표 연결 그룹화
+            var parent = [];
+            for (var k = 0; k < visiblePipes.length; k++) {
+                parent[k] = k;
             }
+
+            function find(i) {
+                if (parent[i] === i) return i;
+                return parent[i] = find(parent[i]);
+            }
+
+            function union(i, j) {
+                var rootI = find(i);
+                var rootJ = find(j);
+                if (rootI !== rootJ) {
+                    parent[rootI] = rootJ;
+                }
+            }
+
+            // 두 좌표 간의 거리가 매우 가까운지(연결되어 있는지) 확인하는 함수
+            function isConnected(path1, path2) {
+                var p1_start = path1[0];
+                var p1_end = path1[path1.length - 1];
+                var p2_start = path2[0];
+                var p2_end = path2[path2.length - 1];
+
+                // 좌표 비교 오차 범위 (약 1m 이내 접촉 여부)
+                var threshold = 0.00005; 
+
+                var checkDist = function(pt1, pt2) {
+                    var dLat = Math.abs(pt1.getLat() - pt2.getLat());
+                    var dLng = Math.abs(pt1.getLng() - pt2.getLng());
+                    return (dLat < threshold && dLng < threshold);
+                };
+
+                return checkDist(p1_start, p2_start) || checkDist(p1_start, p2_end) ||
+                    checkDist(p1_end, p2_start) || checkDist(p1_end, p2_end);
+            }
+
+            // 배관 간 연결 여부 비교 (동일 관경 + 동일 공급/회수 구분 + 좌표 연결)
+            for (var a = 0; a < visiblePipes.length; a++) {
+                for (var b = a + 1; b < visiblePipes.length; b++) {
+                    var pipeA = visiblePipes[a];
+                    var pipeB = visiblePipes[b];
+
+                    if (pipeA.diaCode === pipeB.diaCode && 
+                        pipeA.srCode === pipeB.srCode && 
+                        isConnected(pipeA.path, pipeB.path)) {
+                        union(a, b);
+                    }
+                }
+            }
+
+            // Step 3. 그룹별로 대표 배관들을 묶고 각 그룹당 1개의 라벨만 표시
+            var groups = {};
+            for (var m = 0; m < visiblePipes.length; m++) {
+                var root = find(m);
+                if (!groups[root]) {
+                    groups[root] = [];
+                }
+                groups[root].push(visiblePipes[m]);
+            }
+
+            // 각 그룹의 중앙 배관 조각에 관경 라벨 표시
+            for (var rootKey in groups) {
+                var groupPipes = groups[rootKey];
+                
+                // 그룹 내 배관 조각들 중 중간에 위치한 배관 선택
+                var midPipeIndex = Math.floor(groupPipes.length / 2);
+                var targetPipe = groupPipes[midPipeIndex];
+
+                var midCoordIndex = Math.floor(targetPipe.path.length / 2);
+                var centerPosition = targetPipe.path[midCoordIndex];
+
+                var overlayContent = '<div class="pipe-label">' + targetPipe.diaCode + 'A</div>';
+
+                var customOverlay = new kakao.maps.CustomOverlay({
+                    position: centerPosition,
+                    content: overlayContent,
+                    xAnchor: 0.5,
+                    yAnchor: 0.5
+                });
+
+                customOverlay.setMap(map);
+                activeOverlays.push(customOverlay);
+            }
+        }
         </script>
     </body>
 </html>
