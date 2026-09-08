@@ -42,6 +42,18 @@
                 z-index: 3;
                 pointer-events: none; /* 클릭 이벤트 투과 */
             }
+            /* 배관 관경 라벨 스타일 */
+            .pipe-label {
+                background: #ffffff;
+                border: 1px solid #2b6cb0;
+                border-radius: 4px;
+                padding: 2px 6px;
+                font-size: 11px;
+                font-weight: bold;
+                color: #2b6cb0;
+                box-shadow: 0px 1px 3px rgba(0,0,0,0.2);
+                white-space: nowrap;
+            }
         </style>
     </head>
     <body>
@@ -133,6 +145,7 @@
             // ★ 맵에 배관 그리기
             var Pipes_data = []; 
             var polylines = []; 
+            var overlays = [];
             var infoWindow = null; // 현재 열려있는 팝업 관리용
 
             function clearPipes() {
@@ -303,93 +316,93 @@
 
                 if (visiblePipes.length === 0) return;
 
-            // Step 2. Union-Find 알고리즘을 이용한 좌표 연결 그룹화
-            var parent = [];
-            for (var k = 0; k < visiblePipes.length; k++) {
-                parent[k] = k;
-            }
-
-            function find(i) {
-                if (parent[i] === i) return i;
-                return parent[i] = find(parent[i]);
-            }
-
-            function union(i, j) {
-                var rootI = find(i);
-                var rootJ = find(j);
-                if (rootI !== rootJ) {
-                    parent[rootI] = rootJ;
+                // Step 2. Union-Find 알고리즘을 이용한 좌표 연결 그룹화
+                var parent = [];
+                for (var k = 0; k < visiblePipes.length; k++) {
+                    parent[k] = k;
                 }
-            }
 
-            // 두 좌표 간의 거리가 매우 가까운지(연결되어 있는지) 확인하는 함수
-            function isConnected(path1, path2) {
-                var p1_start = path1[0];
-                var p1_end = path1[path1.length - 1];
-                var p2_start = path2[0];
-                var p2_end = path2[path2.length - 1];
+                function find(i) {
+                    if (parent[i] === i) return i;
+                    return parent[i] = find(parent[i]);
+                }
 
-                // 좌표 비교 오차 범위 (약 1m 이내 접촉 여부)
-                var threshold = 0.00005; 
-
-                var checkDist = function(pt1, pt2) {
-                    var dLat = Math.abs(pt1.getLat() - pt2.getLat());
-                    var dLng = Math.abs(pt1.getLng() - pt2.getLng());
-                    return (dLat < threshold && dLng < threshold);
-                };
-
-                return checkDist(p1_start, p2_start) || checkDist(p1_start, p2_end) ||
-                    checkDist(p1_end, p2_start) || checkDist(p1_end, p2_end);
-            }
-
-            // 배관 간 연결 여부 비교 (동일 관경 + 동일 공급/회수 구분 + 좌표 연결)
-            for (var a = 0; a < visiblePipes.length; a++) {
-                for (var b = a + 1; b < visiblePipes.length; b++) {
-                    var pipeA = visiblePipes[a];
-                    var pipeB = visiblePipes[b];
-
-                    if (pipeA.diaCode === pipeB.diaCode && 
-                        pipeA.srCode === pipeB.srCode && 
-                        isConnected(pipeA.path, pipeB.path)) {
-                        union(a, b);
+                function union(i, j) {
+                    var rootI = find(i);
+                    var rootJ = find(j);
+                    if (rootI !== rootJ) {
+                        parent[rootI] = rootJ;
                     }
                 }
-            }
 
-            // Step 3. 그룹별로 대표 배관들을 묶고 각 그룹당 1개의 라벨만 표시
-            var groups = {};
-            for (var m = 0; m < visiblePipes.length; m++) {
-                var root = find(m);
-                if (!groups[root]) {
-                    groups[root] = [];
+                // 두 좌표 간의 거리가 매우 가까운지(연결되어 있는지) 확인하는 함수
+                function isConnected(path1, path2) {
+                    var p1_start = path1[0];
+                    var p1_end = path1[path1.length - 1];
+                    var p2_start = path2[0];
+                    var p2_end = path2[path2.length - 1];
+
+                    // 좌표 비교 오차 범위 (약 1m 이내 접촉 여부)
+                    var threshold = 0.00005; 
+
+                    var checkDist = function(pt1, pt2) {
+                        var dLat = Math.abs(pt1.getLat() - pt2.getLat());
+                        var dLng = Math.abs(pt1.getLng() - pt2.getLng());
+                        return (dLat < threshold && dLng < threshold);
+                    };
+
+                    return checkDist(p1_start, p2_start) || checkDist(p1_start, p2_end) ||
+                        checkDist(p1_end, p2_start) || checkDist(p1_end, p2_end);
                 }
-                groups[root].push(visiblePipes[m]);
+
+                // 배관 간 연결 여부 비교 (동일 관경 + 동일 공급/회수 구분 + 좌표 연결)
+                for (var a = 0; a < visiblePipes.length; a++) {
+                    for (var b = a + 1; b < visiblePipes.length; b++) {
+                        var pipeA = visiblePipes[a];
+                        var pipeB = visiblePipes[b];
+
+                        if (pipeA.diaCode === pipeB.diaCode && 
+                            pipeA.srCode === pipeB.srCode && 
+                            isConnected(pipeA.path, pipeB.path)) {
+                            union(a, b);
+                        }
+                    }
+                }
+
+                // Step 3. 그룹별로 대표 배관들을 묶고 각 그룹당 1개의 라벨만 표시
+                var groups = {};
+                for (var m = 0; m < visiblePipes.length; m++) {
+                    var root = find(m);
+                    if (!groups[root]) {
+                        groups[root] = [];
+                    }
+                    groups[root].push(visiblePipes[m]);
+                }
+
+                // 각 그룹의 중앙 배관 조각에 관경 라벨 표시
+                for (var rootKey in groups) {
+                    var groupPipes = groups[rootKey];
+                    
+                    // 그룹 내 배관 조각들 중 중간에 위치한 배관 선택
+                    var midPipeIndex = Math.floor(groupPipes.length / 2);
+                    var targetPipe = groupPipes[midPipeIndex];
+
+                    var midCoordIndex = Math.floor(targetPipe.path.length / 2);
+                    var centerPosition = targetPipe.path[midCoordIndex];
+
+                    var overlayContent = '<div class="pipe-label">' + targetPipe.diaCode + 'A</div>';
+
+                    var overlay = new kakao.maps.CustomOverlay({
+                        position: centerPosition,
+                        content: overlayContent,
+                        xAnchor: 0.5,
+                        yAnchor: 0.5
+                    });
+
+                    overlay.setMap(map);
+                    overlays.push(overlay);
+                }
             }
-
-            // 각 그룹의 중앙 배관 조각에 관경 라벨 표시
-            for (var rootKey in groups) {
-                var groupPipes = groups[rootKey];
-                
-                // 그룹 내 배관 조각들 중 중간에 위치한 배관 선택
-                var midPipeIndex = Math.floor(groupPipes.length / 2);
-                var targetPipe = groupPipes[midPipeIndex];
-
-                var midCoordIndex = Math.floor(targetPipe.path.length / 2);
-                var centerPosition = targetPipe.path[midCoordIndex];
-
-                var overlayContent = '<div class="pipe-label">' + targetPipe.diaCode + 'A</div>';
-
-                var customOverlay = new kakao.maps.CustomOverlay({
-                    position: centerPosition,
-                    content: overlayContent,
-                    xAnchor: 0.5,
-                    yAnchor: 0.5
-                });
-
-                customOverlay.setMap(map);
-                activeOverlays.push(customOverlay);
-            }
-        }
         </script>
     </body>
 </html>
