@@ -43,16 +43,40 @@
                 pointer-events: none; /* 클릭 이벤트 투과 */
             }
             /* 배관 관경 라벨 스타일 */
-            .pipe-label {
-                background: #ffffff;
-                border: 1px solid #2b6cb0;
-                border-radius: 4px;
-                padding: 2px 6px;
-                font-size: 11px;
+            .pipe-s-label {
+                font-size: 10px;
                 font-weight: bold;
-                color: #2b6cb0;
-                box-shadow: 0px 1px 3px rgba(0,0,0,0.2);
+                color: #ff0000;
                 white-space: nowrap;
+            }
+            .pipe-r-label {
+                font-size: 10px;
+                font-weight: bold;
+                color: #ffa000;
+                white-space: nowrap;
+            }
+            /* 로드뷰 좌표 오버레이 공통 스타일 */
+            .road-point-overlay {
+                padding: 3px 6px;
+                border-radius: 50%;
+                font-size: 10px;
+                font-weight: bold;
+                color: #ffffff;
+                text-align: center;
+                box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.4);
+                white-space: nowrap;
+            }
+
+            /* S관(공급관) 점 스타일 */
+            .road-point-overlay.road-s-point {
+                background-color: rgba(255, 0, 0, 0.85);
+                border: 1px solid #ffffff;
+            }
+
+            /* R관(회수관) 점 스타일 */
+            .road-point-overlay.road-r-point {
+                background-color: rgba(255, 160, 0, 0.85);
+                border: 1px solid #ffffff;
             }
         </style>
     </head>
@@ -62,19 +86,38 @@
                 <button id="normalBtn" class="btn" onclick="setMapType('normal')">일반</button>
                 <button id="skyviewBtn" class="btn" onclick="setMapType('skyview')">위성</button>
                 <button id="modeRoadBtn" class="btn" onclick="modeRoad()">거리뷰</button>
-                <button id="closeRoadBtn" class="btn" onclick="closeRoad()" style="display: none;">지도로 돌아가기</button>
+                <button id="closeRoadBtn" class="btn" onclick="closeRoadview()" style="display: none;">지도로 돌아가기</button>
             </div>
             <div id="map"></div>
             <div id="road"></div>
             <svg id="svg"></svg>
         </div>
         <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
+        <script src="roadViewControl.js"></script>
+        <script src="pipeManager.js"></script>
         <script>
             var map;
 
             var road;
             var roadClient;
             var roadOn_flag = false;
+
+            var svg;
+
+            /*// ★ 데이터 불러오기 중요 로컬에서 임시로 사용
+            const fileInput = document.getElementById('csvFile');
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const csvText = event.target.result;
+                    parsePipeCsv(csvText);
+                };
+                reader.readAsText(file, 'utf-8');
+            });*/
+
 
             kakao.maps.load(function() {// 처음 시작시
                 // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
@@ -95,7 +138,7 @@
                 road = new kakao.maps.Roadview(document.getElementById('road'));
                 roadClient = new kakao.maps.RoadviewClient();
 
-                // 데이터 불러오기 중요
+                // ★ 데이터 불러오기 중요 서버환경에서만 가능
                 loadCsvPipes('bundang/pipe.csv');
 
                 // 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
@@ -108,9 +151,10 @@
                     localStorage.setItem('last_lng', center.getLng());
                     localStorage.setItem('last_level', level);
 
-                    updateVisiblePipes();
+                    updatPipes();
                 });
 
+                svg = document.getElementById('svg');
                 // 지도 클릭 이벤트 거리뷰 열기
                 kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
                     if (!roadOn_flag) return;
@@ -118,9 +162,9 @@
                 });
 
                 //로드뷰 이벤트
-                //kakao.maps.event.addListener(road, 'viewpoint_changed', requestLineUpdate);
-                //kakao.maps.event.addListener(road, 'position_changed', requestLineUpdate);
-                //kakao.maps.event.addListener(road, 'panoid_changed', requestLineUpdate);
+                kakao.maps.event.addListener(road, 'viewpoint_changed', roadEvent);
+                kakao.maps.event.addListener(road, 'position_changed', roadEvent);
+                kakao.maps.event.addListener(road, 'panoid_changed', roadEvent);
             });
 
             // 거리뷰 모드 켜고 끄기
@@ -142,29 +186,8 @@
                 else if (maptype === 'skyview')  map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
             }
 
-            // ★ 맵에 배관 그리기
-            var Pipes_data = []; 
-            var polylines = []; 
-            var overlays = [];
-            var infoWindow = null; // 현재 열려있는 팝업 관리용
-
-            function clearPipes() {
-                if (infoWindow) {
-                    infoWindow.close();
-                    infoWindow = null;
-                }
-                
-                for (var idx = 0; idx < polylines.length; idx++) {
-                    polylines[idx].setMap(null);
-                }
-                polylines = [];
-            }
-
             // CSV 파일 읽어오기
             function loadCsvPipes(filePath) {
-                clearPipes();
-                Pipes_data = [];
-
                 fetch(filePath)
                     .then(function(response) {
                         if (!response.ok) throw new Error("CSV 파일 로드 실패");
@@ -172,236 +195,10 @@
                     })
                     .then(function(csvText) {
                         parsePipeCsv(csvText);
-                        updateVisiblePipes();
                     })
                     .catch(function(error) {
                         console.error("오류 발생:", error);
                     });
-            }
-
-            // CSV 파싱 시 상세 정보 컬럼 추출
-            function parsePipeCsv(csvText) {
-                var lines = csvText.trim().split('\n');
-                if (lines.length <= 1) return;
-
-                for (var i = 1; i < lines.length; i++) {
-                    var line = lines[i].trim();
-                    if (!line) continue;
-
-                    var coordStartIndex = line.indexOf('"[');
-                    var coordEndIndex = line.lastIndexOf(']"');
-
-                    if (coordStartIndex === -1 || coordEndIndex === -1) continue;
-
-                    var propertiesPart = line.substring(0, coordStartIndex);
-                    var columns = propertiesPart.split(',');
-
-                    // 컬럼 파싱 (CSV 컬럼 순서 기준)
-                    var eqpId = columns[0] ? columns[0].trim() : '';
-                    var srCode = columns[1] ? columns[1].trim() : '';
-                    var cntrwkNm = columns[2] ? columns[2].replace(/^"|"$/g, '').trim() : ''; // 공사명
-                    var diaCode = parseInt(columns[3], 10) || 0;
-                    var pipePress = columns[4] ? columns[4].trim() : '';
-                    var plineLt = columns[5] ? columns[5].trim() : ''; // 연장(m)
-                    var competDe = columns[6] ? columns[6].trim() : ''; // 준공일자
-                    var qltyGrade = columns[7] ? columns[7].trim() : ''; // 품질등급
-                    var avgDph = columns[10] ? columns[10].trim() : ''; // 평균심도
-
-                    var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
-
-                    try {
-                        var rawCoords = JSON.parse(coordString);
-                        var linePath = [];
-                        var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-
-                        for (var j = 0; j < rawCoords.length; j++) {
-                            var lng = rawCoords[j][0];
-                            var lat = rawCoords[j][1];
-                            linePath.push(new kakao.maps.LatLng(lat, lng));
-
-                            if (lat < minLat) minLat = lat;
-                            if (lat > maxLat) maxLat = lat;
-                            if (lng < minLng) minLng = lng;
-                            if (lng > maxLng) maxLng = lng;
-                        }
-
-                        Pipes_data.push({
-                            eqpId: eqpId,
-                            srCode: srCode,
-                            diaCode: diaCode,
-                            cntrwkNm: cntrwkNm,
-                            pipePress: pipePress,
-                            plineLt: plineLt,
-                            competDe: competDe,
-                            qltyGrade: qltyGrade,
-                            avgDph: avgDph,
-                            path: linePath,
-                            bounds: new kakao.maps.LatLngBounds(
-                                new kakao.maps.LatLng(minLat, minLng),
-                                new kakao.maps.LatLng(maxLat, maxLng)
-                            )
-                        });
-
-                    } catch (e) {
-                        console.error(i + "번째 행 좌표 변환 실패:", e);
-                    }
-                }
-            }
-            
-            // 3. 레벨/구경 조건 필터링 및 공간적 연결성(Spatial Connection) 기반 라벨 통합
-            function updateVisiblePipes() {
-                if (!map || Pipes_data.length === 0) return;
-                clearPipes();
-                var currentLevel = map.getLevel();
-
-                if (currentLevel >= 5) return;// 레벨 5 이상 비표시
-
-                var mapBounds = map.getBounds();
-                var visiblePipes = []; // 화면 범위 내에 들어오는 배관 모음
-
-                // Step 1. 화면 내 표시 대상 배관 필터링 및 Line 그리기
-                for (var i = 0; i < Pipes_data.length; i++) {
-                    var pipe = Pipes_data[i];
-
-                    if (mapBounds.intersects(pipe.bounds)) {
-                        var lineColor = '#FF0000';
-                        if (pipe.srCode === 'R') lineColor = '#FFA500';
-                        else if (pipe.srCode !== 'S') lineColor = '#888888';
-
-                        var polyline = new kakao.maps.Polyline({
-                            path: pipe.path,
-                            strokeWeight: 1, // 클릭이 용이하도록 선 두께를 약간 넓힘
-                            strokeColor: lineColor,
-                            strokeStyle: 'solid'
-                        });
-
-                        polyline.setMap(map);
-                        polylines.push(polyline);
-                        visiblePipes.push(pipe);
-
-                        // 배관(Polyline) 클릭 이벤트 바인딩 (클로저 처리)
-                        (function(targetPolyline, targetPipe) {
-                            kakao.maps.event.addListener(targetPolyline, 'click', function(mouseEvent) {
-                                // 기존 열린 팝업이 있으면 닫기
-                                if (infoWindow) infoWindow.close();
-
-                                var srText = targetPipe.srCode === 'S' ? '공급관(S)' : (targetPipe.srCode === 'R' ? '회수관(R)' : '기타');
-
-                                // 팝업 HTML 컨텐츠
-                                var infoContent = 
-                                    '<div style="padding:10px; font-size:12px; width:220px; line-height:1.6; color:#333;">' +
-                                        '<div style="font-weight:bold; font-size:13px; border-bottom:2px solid #2b6cb0; padding-bottom:3px; margin-bottom:6px;">' +
-                                            '배관 상세 정보 (' + targetPipe.eqpId + ')' +
-                                        '</div>' +
-                                        '<b>구분:</b> ' + srText + '-' + (targetPipe.pipePress || '-') + 'bar<br>' +
-                                        '<b>관경:</b> ' + (targetPipe.diaCode || '-') + 'A'+ '<br>' +
-                                        '<b>길이:</b> ' + (targetPipe.plineLt || '-') + ' m<br>' +
-                                        '<b>심도:</b> ' + (targetPipe.avgDph || '-') + ' m<br>' +
-                                        '<b>설치일:</b> ' + (targetPipe.competDe || '-') + '<br>' +
-                                        '<b>공사명:</b> ' + (targetPipe.cntrwkNm || '-') +
-                                    '</div>';
-
-                                // 클릭한 지점 위치에 인포윈도우 생성
-                                infoWindow = new kakao.maps.InfoWindow({
-                                    position: mouseEvent.latLng,
-                                    content: infoContent,
-                                    removable: true // 닫기(X) 버튼 표시
-                                });
-
-                                infoWindow.open(map);
-                            });
-                        })(polyline, pipe);
-                    }
-                }
-
-                if (visiblePipes.length === 0) return;
-
-                // Step 2. Union-Find 알고리즘을 이용한 좌표 연결 그룹화
-                var parent = [];
-                for (var k = 0; k < visiblePipes.length; k++) {
-                    parent[k] = k;
-                }
-
-                function find(i) {
-                    if (parent[i] === i) return i;
-                    return parent[i] = find(parent[i]);
-                }
-
-                function union(i, j) {
-                    var rootI = find(i);
-                    var rootJ = find(j);
-                    if (rootI !== rootJ) {
-                        parent[rootI] = rootJ;
-                    }
-                }
-
-                // 두 좌표 간의 거리가 매우 가까운지(연결되어 있는지) 확인하는 함수
-                function isConnected(path1, path2) {
-                    var p1_start = path1[0];
-                    var p1_end = path1[path1.length - 1];
-                    var p2_start = path2[0];
-                    var p2_end = path2[path2.length - 1];
-
-                    // 좌표 비교 오차 범위 (약 1m 이내 접촉 여부)
-                    var threshold = 0.00005; 
-
-                    var checkDist = function(pt1, pt2) {
-                        var dLat = Math.abs(pt1.getLat() - pt2.getLat());
-                        var dLng = Math.abs(pt1.getLng() - pt2.getLng());
-                        return (dLat < threshold && dLng < threshold);
-                    };
-
-                    return checkDist(p1_start, p2_start) || checkDist(p1_start, p2_end) ||
-                        checkDist(p1_end, p2_start) || checkDist(p1_end, p2_end);
-                }
-
-                // 배관 간 연결 여부 비교 (동일 관경 + 동일 공급/회수 구분 + 좌표 연결)
-                for (var a = 0; a < visiblePipes.length; a++) {
-                    for (var b = a + 1; b < visiblePipes.length; b++) {
-                        var pipeA = visiblePipes[a];
-                        var pipeB = visiblePipes[b];
-
-                        if (pipeA.diaCode === pipeB.diaCode && 
-                            pipeA.srCode === pipeB.srCode && 
-                            isConnected(pipeA.path, pipeB.path)) {
-                            union(a, b);
-                        }
-                    }
-                }
-
-                // Step 3. 그룹별로 대표 배관들을 묶고 각 그룹당 1개의 라벨만 표시
-                var groups = {};
-                for (var m = 0; m < visiblePipes.length; m++) {
-                    var root = find(m);
-                    if (!groups[root]) {
-                        groups[root] = [];
-                    }
-                    groups[root].push(visiblePipes[m]);
-                }
-
-                // 각 그룹의 중앙 배관 조각에 관경 라벨 표시
-                for (var rootKey in groups) {
-                    var groupPipes = groups[rootKey];
-                    
-                    // 그룹 내 배관 조각들 중 중간에 위치한 배관 선택
-                    var midPipeIndex = Math.floor(groupPipes.length / 2);
-                    var targetPipe = groupPipes[midPipeIndex];
-
-                    var midCoordIndex = Math.floor(targetPipe.path.length / 2);
-                    var centerPosition = targetPipe.path[midCoordIndex];
-
-                    var overlayContent = '<div class="pipe-label">' + targetPipe.diaCode + 'A</div>';
-
-                    var overlay = new kakao.maps.CustomOverlay({
-                        position: centerPosition,
-                        content: overlayContent,
-                        xAnchor: 0.5,
-                        yAnchor: 0.5
-                    });
-
-                    overlay.setMap(map);
-                    overlays.push(overlay);
-                }
             }
         </script>
     </body>
