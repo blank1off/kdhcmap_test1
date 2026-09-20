@@ -39,7 +39,7 @@
                 position: absolute;
                 top: 0; left: 0;
                 width: 100%; height: 100%;
-                z-index: 3;
+                z-index: 5;
                 pointer-events: none; /* 클릭 이벤트 투과 */
             }
             /* 배관 관경 라벨 스타일 */
@@ -78,6 +78,14 @@
                 background-color: rgba(255, 160, 0, 0.85);
                 border: 1px solid #ffffff;
             }
+
+            #camera {
+                position: absolute;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                z-index: 3;
+                display: none;
+            }
         </style>
     </head>
     <body>
@@ -87,20 +95,27 @@
                 <button id="skyviewBtn" class="btn" onclick="setMapType('skyview')">위성</button>
                 <button id="modeRoadBtn" class="btn" onclick="modeRoad()">거리뷰</button>
                 <button id="closeRoadBtn" class="btn" onclick="closeRoadview()" style="display: none;">지도로 돌아가기</button>
+                <button id="myLocationBtn" class="btn" onclick="moveToMyLocation()">내위치</button>
+                <button id="openCameraBtn" onclick="openCameraView()">카메라 열기</button>
+                <button id="closeCameraBtn" onclick="closeCameraView()" style="display: none;">카메라 닫기</button>
             </div>
             <div id="map"></div>
             <div id="road"></div>
+            <video id="camera" autoplay playsinline></video>
             <svg id="svg"></svg>
         </div>
         <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
         <script src="roadViewControl.js"></script>
         <script src="pipeManager.js"></script>
+        <script src="cameraView.js"></script>
         <script>
             var map;
 
             var road;
             var roadClient;
             var roadOn_flag = false;
+
+            var video;
 
             var svg;
 
@@ -165,6 +180,8 @@
                 kakao.maps.event.addListener(road, 'viewpoint_changed', roadEvent);
                 kakao.maps.event.addListener(road, 'position_changed', roadEvent);
                 kakao.maps.event.addListener(road, 'panoid_changed', roadEvent);
+
+                video = document.getElementById("camera");
             });
 
             // 거리뷰 모드 켜고 끄기
@@ -199,6 +216,87 @@
                     .catch(function(error) {
                         console.error("오류 발생:", error);
                     });
+            }
+
+            // 스마트폰인지 확인
+            function isMobileDevice() {
+
+                return /Android|Phone|iPad|iPod/i.test(navigator.userAgent);
+            }
+            // 스마트폰에서만 버튼 표시
+            function initMobileButtons() {
+
+                if (!isMobileDevice()) {
+                    console.log("PC / 노트북");
+
+                    document.getElementById("myLocationBtn").style.display = "none";
+                    document.getElementById("openCameraBtn").style.display = "none";
+                    document.getElementById("closeCameraBtn").style.display = "none";
+                    return;
+                }
+
+                console.log("스마트폰");
+
+                document.getElementById("myLocationBtn").style.display = "block";
+                document.getElementById("openCameraBtn").style.display = "block";
+                document.getElementById("closeCameraBtn").style.display = "none";
+            }
+
+            initMobileButtons();
+
+            function moveToMyLocation() {
+                console.log("내 위치 버튼 클릭");
+
+                if (!navigator.geolocation) {
+                    alert("이 기기에서는 위치 정보를 사용할 수 없습니다.");
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+
+                    function(position) {
+
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+
+                        console.log("내 위치");
+                        console.log("latitude :", lat);
+                        console.log("longitude:", lng);
+                        console.log("accuracy :", position.coords.accuracy);
+
+                        if (!map) {
+                            console.error("map이 아직 생성되지 않았습니다.");
+                            return;
+                        }
+
+                        var myPosition = new kakao.maps.LatLng(lat, lng);
+
+                        map.panTo(myPosition);
+
+                    },
+
+                    function(error) {
+
+                        console.error("위치 가져오기 실패:", error);
+
+                        if (error.code === 1) {
+                            alert("위치 권한이 허용되지 않았습니다.");
+                        }
+                        else if (error.code === 2) {
+                            alert("현재 위치를 확인할 수 없습니다.");
+                        }
+                        else if (error.code === 3) {
+                            alert("위치 확인 시간이 초과되었습니다.");
+                        }
+
+                    },
+
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
             }
         </script>
     </body>

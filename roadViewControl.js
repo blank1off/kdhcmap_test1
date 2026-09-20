@@ -15,13 +15,18 @@ var cLag = null;
 var viewpoint = null;
 var cPan = null;
 
-function openRoadview(position) {document.getElementById('map').style.display = 'none';
+function openRoadview(position) {
+    document.getElementById('map').style.display = 'none';
+    document.getElementById("camera").style.display = 'none';
     document.getElementById('road').style.display = 'block';
 
     document.getElementById('normalBtn').style.display = 'none';
     document.getElementById('skyviewBtn').style.display = 'none';
     document.getElementById('modeRoadBtn').style.display = 'none';
     document.getElementById('closeRoadBtn').style.display = 'block';
+    document.getElementById('myLocationBtn').style.display = 'none';
+    document.getElementById('openCameraBtn').style.display = 'none';
+    document.getElementById('closeCameraBtn').style.display = 'none';
 
     road.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
@@ -40,12 +45,18 @@ function closeRoadview() {
     clearRoadOverlays(); // 로드뷰 닫을 때 오버레이 제거
 
     document.getElementById('road').style.display = 'none';
+    document.getElementById("camera").style.display = 'none';
     document.getElementById('map').style.display = 'block';
 
     document.getElementById('normalBtn').style.display = 'block';
     document.getElementById('skyviewBtn').style.display = 'block';
     document.getElementById('modeRoadBtn').style.display = 'block';
     document.getElementById('closeRoadBtn').style.display = 'none';
+    if (isMobileDevice()) {
+        document.getElementById('myLocationBtn').style.display = 'block';
+        document.getElementById('openCameraBtn').style.display = 'block';
+    }
+    document.getElementById('closeCameraBtn').style.display = 'none';
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 }
