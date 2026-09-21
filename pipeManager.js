@@ -181,7 +181,7 @@ function make_groups() {
     }
 }
 
-function updatPipes(){
+function updatePipes(){
     clearPipes();
     drawPipes();
     make_groups();
@@ -255,5 +255,5 @@ function parsePipeCsv(csvText) {
             console.error(i + "번째 행 좌표 변환 실패:", e);
         }
     }
-    updatPipes();
+    updatePipes();
 }

@@ -11,7 +11,7 @@ var height = null;
 
 var position = null;
 var cLat = null;
-var cLag = null;
+var cLng = null;
 var viewpoint = null;
 var cPan = null;
 
@@ -351,6 +351,7 @@ function findVisibleTempPoint2(path1, path2, pipeIdx) {
         if (visible){
             visiblePoint1 = {point: point,x: tx,y: ty};
             console.log(visiblePoint1)
+            tempElement.remove();
             break;
         }
         else tempElement.remove();
@@ -373,6 +374,7 @@ function findVisibleTempPoint2(path1, path2, pipeIdx) {
         if (visible){
             visiblePoint2 = {point: point,x: tx,y: ty};
             console.log(visiblePoint2)
+            tempElement.remove();
             break;
         }
         else tempElement.remove();
