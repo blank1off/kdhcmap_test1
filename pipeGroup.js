@@ -627,6 +627,7 @@ function extendToScreenEdge(x1, y1, dx, dy) {
 //카메라
 var camPosition = null;
 var CAMERA_FOV = 60;
+var CAMERA_MAX_DISTANCE = 10;
 
 function PPGcamUpdate(event){
     // 기존 점 삭제
@@ -660,10 +661,11 @@ function PPGcamUpdate(event){
 
     // 북쪽 5m
     var point5m = getPointByDistance(lat, lng, 0, 5);
-
-
-    drawProjectedPoint(camSVG,point3m,3,heading);
-    drawProjectedPoint(camSVG,point5m,5,heading);
+    // 프레임 지연으로 DOM 레이아웃 확정 보장
+    requestAnimationFrame(function() {
+        drawProjectedPoint(camSVG,point3m,3,heading);
+        drawProjectedPoint(camSVG,point5m,5,heading);
+    });
 }
 function testCamPoint(svg, distance) {
     var rect = svg.getBoundingClientRect();
@@ -744,6 +746,9 @@ function getCurrentLocation() {
         }
     );
 }
+var CAMERA_FOV = 60;
+var CAMERA_MAX_DISTANCE = 10;
+
 function drawProjectedPoint(svg, point, distance, heading) {
 
     var rect = svg.getBoundingClientRect();
@@ -754,7 +759,7 @@ function drawProjectedPoint(svg, point, distance, heading) {
     var centerX = width / 2;
     var centerY = height / 2;
 
-    // 점의 방위각
+    // 카메라 → 점의 방위각
     var bearing = getBearing(
         camPosition.lat,
         camPosition.lng,
@@ -762,10 +767,9 @@ function drawProjectedPoint(svg, point, distance, heading) {
         point.getLng()
     );
 
-    // 카메라 정면을 기준으로 한 각도
+    // 카메라 정면 기준 상대각
     var relativeAngle = bearing - heading;
 
-    // -180 ~ +180
     while (relativeAngle > 180) {
         relativeAngle -= 360;
     }
@@ -774,7 +778,7 @@ function drawProjectedPoint(svg, point, distance, heading) {
         relativeAngle += 360;
     }
 
-    // 화면 밖이면 표시하지 않음
+    // 카메라 FOV 밖
     if (
         relativeAngle < -CAMERA_FOV / 2 ||
         relativeAngle > CAMERA_FOV / 2
@@ -782,14 +786,34 @@ function drawProjectedPoint(svg, point, distance, heading) {
         return;
     }
 
-    // 화면 X 위치
+    // -------------------------
+    // X : 방위각
+    // -------------------------
+
     var x =
         centerX +
         (relativeAngle / (CAMERA_FOV / 2)) *
         centerX;
 
-    // 일단 Y는 화면 중앙
-    var y = centerY;
+
+    // -------------------------
+    // Y : 거리
+    // -------------------------
+
+    var distanceRatio =
+        Math.min(distance / CAMERA_MAX_DISTANCE, 1);
+
+    // 가까울수록 아래
+    // 멀수록 위
+
+    var y =
+        height * 0.8 -
+        distanceRatio * height * 0.6;
+
+
+    // -------------------------
+    // 점 그리기
+    // -------------------------
 
     var circle = document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -806,6 +830,7 @@ function drawProjectedPoint(svg, point, distance, heading) {
     );
 
     svg.appendChild(circle);
+
 
     console.log(
         distance + "m",
