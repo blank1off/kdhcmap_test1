@@ -653,6 +653,9 @@ function PPGcamUpdate(event){
     var lat = camPosition.lat;
     var lng = camPosition.lng;
 
+    // 기존 점 삭제
+    camSVG.replaceChildren();
+
     // 북쪽 3m
     var point3m = getPointByDistance(lat, lng, 0, 3);
 
@@ -714,6 +717,33 @@ function drawCamPoint(svg, point, distance, text) {
         text,
         point.getLat(),
         point.getLng()
+    );
+}
+function getPointByDistance(lat, lng, bearing, distance) {
+
+    var R = 6371000;
+
+    var radLat = lat * Math.PI / 180;
+    var radLng = lng * Math.PI / 180;
+    var radBearing = bearing * Math.PI / 180;
+
+    var angularDistance = distance / R;
+
+    var newLat = Math.asin(
+        Math.sin(radLat) * Math.cos(angularDistance) +
+        Math.cos(radLat) * Math.sin(angularDistance) *
+        Math.cos(radBearing)
+    );
+
+    var newLng = radLng + Math.atan2(
+        Math.sin(radBearing) * Math.sin(angularDistance) * Math.cos(radLat),
+        Math.cos(angularDistance) -
+        Math.sin(radLat) * Math.sin(newLat)
+    );
+
+    return new kakao.maps.LatLng(
+        newLat * 180 / Math.PI,
+        newLng * 180 / Math.PI
     );
 }
 // 현재 위치 가져오기
