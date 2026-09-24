@@ -626,6 +626,7 @@ function extendToScreenEdge(x1, y1, dx, dy) {
 
 //카메라
 var camPosition = null;
+var CAMERA_FOV = 60;
 
 function PPGcamUpdate(event){
     var heading = null;
@@ -663,6 +664,57 @@ function PPGcamUpdate(event){
 
     console.log("북쪽 3m:", point3m.getLat(), point3m.getLng());
     console.log("북쪽 5m:", point5m.getLat(), point5m.getLng());
+
+    drawCamPoint(
+        camSVG,
+        point3m,
+        3,
+        "3m"
+    );
+
+    drawCamPoint(
+        camSVG,
+        point5m,
+        5,
+        "5m"
+    );
+}
+function drawCamPoint(svg, point, distance, text) {
+
+    var rect = svg.getBoundingClientRect();
+
+    var width = rect.width;
+    var height = rect.height;
+
+    var cx = width / 2;
+    var cy = height / 2;
+
+    // 테스트용:
+    // 일단 북쪽 점을 화면 중앙에 표시
+    var x = cx;
+    var y = cy;
+
+    var circle = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "circle"
+    );
+
+    circle.setAttribute("cx", x);
+    circle.setAttribute("cy", y);
+    circle.setAttribute("r", 10);
+
+    circle.setAttribute(
+        "data-distance",
+        distance
+    );
+
+    svg.appendChild(circle);
+
+    console.log(
+        text,
+        point.getLat(),
+        point.getLng()
+    );
 }
 // 현재 위치 가져오기
 function getCurrentLocation() {
