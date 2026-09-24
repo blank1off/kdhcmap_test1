@@ -111,7 +111,7 @@ function updatePPgroup(){
 function clearPPgroup() {
     if (infoWindow) infoWindow.close();
     for (var idx = 0; idx < mapOverlays.length; idx++) {
-        overlays[idx].setMap(null);
+        mapOverlays[idx].setMap(null);
     }
     for (var idx = 0; idx < allPoly.length; idx++) {
         allPoly[idx].setMap(null);
@@ -324,6 +324,8 @@ function PPGroadUpdate() {
     if (!position) return;
     var cLat = position.getLat();
     var cLng = position.getLng();
+    console.log(cLat)
+    console.log(cLng)
 
     var viewpoint = roadView.getViewpoint();
     if (!viewpoint) return;
@@ -625,44 +627,93 @@ function extendToScreenEdge(x1, y1, dx, dy) {
 }
 
 //카메라
-var camPosition = null;
+var CCPos = null;
 var CAMERA_FOV = 60;
 var CAMERA_MAX_DISTANCE = 10;
 var camPoints = [];
 var heading = null;
-
+var smoothHeading = null; // ★ 이 위치에 변수 선언을 추가합니다.
+var CAMERA_FOV_X = 60; // 가로 FOV
+var CAMERA_HEIGHT = 1.5; // 스마트폰을 들고 있는 높이 (지면으로부터 약 1.5m)
+var devicePitch = 0; // 카메라 상하 기울기 (기본값 0: 정면 주시)
+var HEADING_THRESHOLD = 3.0; // 3도 이상 변경 시에만 렌더링
+var POSITION_THRESHOLD = 0.8; // 0.8m 이상 이동 시에만 렌더링
+// 센서 임계값 및 이전 상태 저장 변수
+var lastRenderHeading = null;
+var lastRenderPos = null;
 
 function PPGcamUpdate(event){
-    camSVG.replaceChildren();// 기존 점 삭제
+    
 
-    getCurrentLocation();// 현재 카메라 위치 
-    if (camPosition == null) {
+    //가짜 camPosition 만들기
+    var tlat = 37.369932982787454;
+    var tlng = 127.10797640931209;
+    // GPS 수신 함수 대신 가짜 위치 전달
+    CCPos = {lat: tlat, lng: tlng};
+
+    //getCurrentLocation();// 현재 카메라 위치 
+    if (CCPos == null) {
         console.log("현재 카메라 위치가 없습니다.");
         return;
     }
     
     // iPhone / iPad 계열
-    if (event.webkitCompassHeading != null) {
-        heading = event.webkitCompassHeading;
-    }
+    if (event.webkitCompassHeading != null) heading = event.webkitCompassHeading;
     // Android 계열
-    else if (event.alpha != null) {
-        heading = 360 - event.alpha;
-    }
+    else if (event.alpha != null) heading = 360 - event.alpha;
 
     if (heading == null) return;
     heading = smoothCompassHeading(heading);
 
-    var lat = camPosition.lat;
-    var lng = camPosition.lng;
+    
 
-    camPoints.push(getPointByDistance(lat, lng, 0, 3))// 북쪽 3m
-    camPoints.push(getPointByDistance(lat, lng, 0, 5))// 북쪽 5m
+    //camPoints.push(getPointByDistance(lat, lng, 0, 3))// 북쪽 3m
+    //camPoints.push(getPointByDistance(lat, lng, 0, 5))// 북쪽 5m
     // 프레임 지연으로 DOM 레이아웃 확정 보장
     requestAnimationFrame(function() {
+        camSVG.replaceChildren();// 기존 점 삭제
+        camPoints = [];
+        findNearbyPipePoints(); // 주변 배관 데이터 수집 실행 (p1, p2 세그먼트 등록)
         drawProjectedPoint();
     });
 }
+
+/*function PPGcamUpdate(event) {
+    // 1. 가짜 camPosition 설정 (또는 실제 GPS 위치)
+    var tlat = 37.369932982787454;
+    var tlng = 127.10797640931209;
+    CCPos = { lat: tlat, lng: tlng };
+
+    if (CCPos == null) return;
+
+    // 2. heading 추출
+    var rawHeading = null;
+    if (event.webkitCompassHeading != null) rawHeading = event.webkitCompassHeading;
+    else if (event.alpha != null) rawHeading = 360 - event.alpha;
+
+    if (rawHeading == null) return;
+
+    // 3. 부드러운 회전 적용 (스무딩)
+    heading = smoothCompassHeading(rawHeading);
+
+    // 4. 변화량 검사 (임계값 체크)
+    if (!shouldRedraw(heading, CCPos)) {
+        return; // 변화량이 작으면 그리지 않고 이전 화면 유지!
+    }
+
+    // 5. 임계값을 넘었을 때만 이전 좌표 기록 update & SVG 재렌더링
+    lastRenderHeading = heading;
+    lastRenderPos = { lat: CCPos.lat, lng: CCPos.lng };
+
+    // 디바운스 타이머 설정 (요청 간격 조절)
+    if (camUpdateTimer) clearTimeout(camUpdateTimer);
+    camUpdateTimer = setTimeout(function() {
+        if (camSVG) camSVG.replaceChildren(); // 실제 그릴 때만 초기화
+        
+        findNearbyPipePoints();
+        requestAnimationFrame(function() {drawProjectedPoint();});
+    }, 30); // 30ms 디바운스
+}*/
 /*function testCamPoint(svg, distance) {
     var rect = svg.getBoundingClientRect();
 
@@ -689,6 +740,28 @@ function PPGcamUpdate(event){
     circle.setAttribute("data-distance",distance);
     svg.appendChild(circle);
 }*/
+
+// 렌더링 필요 여부 판단 함수
+function shouldRedraw(currentHeading, currentPos) {
+    // 최초 실행 시 무조건 그림
+    if (lastRenderHeading === null || lastRenderPos === null) return true;
+
+    // 1. 각도 변화량 계산
+    var angleDiff = Math.abs(currentHeading - lastRenderHeading);
+    if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+    if (angleDiff >= HEADING_THRESHOLD) return true;
+
+    // 2. 위치 변화량 계산
+    var distDiff = getDistanceMeter(
+        lastRenderPos.lat, lastRenderPos.lng,
+        currentPos.lat, currentPos.lng
+    );
+
+    if (distDiff >= POSITION_THRESHOLD) return true;
+
+    return false; // 변화가 임계값 미만이면 재그리기 건너뜀
+}
 function smoothCompassHeading(newHeading) {
     if (smoothHeading == null) {
         smoothHeading = newHeading;
@@ -699,7 +772,7 @@ function smoothCompassHeading(newHeading) {
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
 
-    smoothHeading += diff * 0.15;
+    smoothHeading += diff * 0.1;
     if (smoothHeading < 0) smoothHeading += 360;
     if (smoothHeading >= 360) smoothHeading -= 360;
 
@@ -736,7 +809,7 @@ function getPointByDistance(lat, lng, bearing, distance) {
 function getCurrentLocation() {
     navigator.geolocation.watchPosition(
         function(position) {
-            camPosition = {
+            CCPos = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
             };
@@ -752,7 +825,7 @@ function getCurrentLocation() {
     );
 }
 
-function drawProjectedPoint() {
+/*function drawProjectedPoint() {
     var rect = camSVG.getBoundingClientRect();
     var width = rect.width;
     var height = rect.height;
@@ -786,8 +859,335 @@ function drawProjectedPoint() {
 
         camSVG.appendChild(circle);
     }
-    
+}*/
+// 가짜 카메라 위치 주변의 배관 세그먼트 및 점 선별 함수
+function findNearbyPipePoints() {
+    if (!allPPgroup || allPPgroup.length === 0) return;
 
+    allPPgroup.forEach(function(PPG, pipeIdx) { // pipeIdx 추가
+        if (!PPG.coords || PPG.coords.length < 2) return;
 
+        for (var i = 0; i < PPG.coords.length - 1; i++) {
+            var path1 = PPG.coords[i];
+            var path2 = PPG.coords[i + 1];
+
+            var dist1 = getDistanceMeter(CCPos.lat, CCPos.lng, path1.getLat(), path1.getLng());
+            var dist2 = getDistanceMeter(CCPos.lat, CCPos.lng, path2.getLat(), path2.getLng());
+
+            if (dist1 <= targetDistance || dist2 <= targetDistance) {
+                var pipeColor = '#888888';
+                if (PPG.srCode === 'S') pipeColor = '#FF0000';
+                if (PPG.srCode === 'R') pipeColor = '#FFA000';
+
+                camPoints.push({
+                    pipeIdx: pipeIdx,       // 배관 객체 인덱스
+                    pointIdx: i,            // 배관 내 세그먼트 시작점 인덱스
+                    p1: path1,
+                    p2: path2,
+                    color: pipeColor,
+                    diaCode: PPG.diaCode,
+                    srCode: PPG.srCode
+                });
+            }
+        }
+    });
+}
+
+/*// 투영된 화면 좌표 계산 및 점/선 그리기
+function drawProjectedPoint() {
+    var rect = camSVG.getBoundingClientRect();
+    var width = rect.width;
+    var height = rect.height;
+    var centerX = width / 2;
+
+    camPoints.forEach(function(segment) {
+        // 경로 상의 점 1과 점 2 화면 좌표 계산
+        var pt1 = projectLatLngToScreen(segment.p1, width, height, centerX);
+        var pt2 = projectLatLngToScreen(segment.p2, width, height, centerX);
+
+        // 1. 점 2개가 모두 화면 시야 내에 있는 경우 선 그리기
+        if (pt1.visible && pt2.visible) {
+            var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", pt1.x.toFixed(1));
+            line.setAttribute("y1", pt1.y.toFixed(1));
+            line.setAttribute("x2", pt2.x.toFixed(1));
+            line.setAttribute("y2", pt2.y.toFixed(1));
+            line.setAttribute("stroke", segment.color);
+            line.setAttribute("stroke-width", "3");
+            line.setAttribute("opacity", "0.85");
+            camSVG.appendChild(line);
+        }
+
+        // 2. 시야 내 점 표시 (원 생성)
+        if (pt1.visible) drawCamCircle(pt1.x, pt1.y, segment.color);
+        if (pt2.visible) drawCamCircle(pt2.x, pt2.y, segment.color);
+    });
+}*/
+
+// 위경도를 화면 (X, Y) 좌표로 변환하는 보조 함수
+/*function projectLatLngToScreen(latLng, width, height, centerX) {
+    var lat = latLng.getLat();
+    var lng = latLng.getLng();
+
+    var distance = getDistanceMeter(CCPos.lat, CCPos.lng, lat, lng);
+    var bearing = getBearing(CCPos.lat, CCPos.lng, lat, lng);
+
+    var relativeAngle = bearing - heading;
+    while (relativeAngle > 180) { relativeAngle -= 360; }
+    while (relativeAngle < -180) { relativeAngle += 360; }
+
+    // 시야각(CAMERA_FOV) 벗어난 경우 제외
+    if (relativeAngle < -CAMERA_FOV / 2 || relativeAngle > CAMERA_FOV / 2 || distance > targetDistance) {
+        return { visible: false };
+    }
+
+    // X, Y 투영 좌표계 산출
+    var x = centerX + (relativeAngle / (CAMERA_FOV / 2)) * centerX;
+    var distanceRatio = Math.min(distance / targetDistance, 1);
+    var y = height * 0.8 - distanceRatio * height * 0.6;
+
+    return { visible: true, x: x, y: y };
+}*/
+// 투영 좌표 계산 함수 개선
+function projectLatLngToScreen(latLng, width, height, centerX, avgDph) {
+    var lat = latLng.getLat();
+    var lng = latLng.getLng();
+
+    // 1. 평면 거리 및 방위각 계산
+    var distance = getDistanceMeter(CCPos.lat, CCPos.lng, lat, lng);
+    var bearing = getBearing(CCPos.lat, CCPos.lng, lat, lng);
+
+    // 2. 가로(X) 상대각 계산
+    var relativeAngleX = bearing - heading;
+    while (relativeAngleX > 180) { relativeAngleX -= 360; }
+    while (relativeAngleX < -180) { relativeAngleX += 360; }
+
+    // 가로 FOV 벗어남 또는 거리 초과 검사
+    if (Math.abs(relativeAngleX) > CAMERA_FOV_X / 2 || distance > targetDistance || distance < 0.1) {
+        return { visible: false };
+    }
+
+    // 3. 화면 X 좌표 (가로)
+    var x = centerX + (Math.tan(relativeAngleX * Math.PI / 180) / Math.tan((CAMERA_FOV_X / 2) * Math.PI / 180)) * centerX;
+
+    // ----------------------------------------------------
+    // 4. 세로(Y) 원근 투영 계산 (개선 파트)
+    // ----------------------------------------------------
+    // 배관 심도 적용 (dph 값이 없으면 기본 1.2m 매설로 가정)
+    var depth = (avgDph !== undefined && !isNaN(parseFloat(avgDph))) ? parseFloat(avgDph) : 1.2;
     
+    // 고도차 계산: 카메라 높이(+1.5m) ~ 매설 깊이(-depth)
+    var deltaH = - (CAMERA_HEIGHT + depth); // 지하에 있으므로 음수 높이차
+
+    // 카메라 기준 고도 각도 (rad)
+    var elevationAngle = Math.atan2(deltaH, distance) * (180 / Math.PI); // 도 단위 변환
+
+    // 스마트폰 피치(기울기) 보정 반영
+    var relativeAngleY = elevationAngle - devicePitch;
+
+    // 화면 비율(Aspect Ratio)에 맞춘 수직 FOV_Y 계산
+    var fovY = 2 * Math.atan(Math.tan((CAMERA_FOV_X / 2) * Math.PI / 180) * (height / width)) * (180 / Math.PI);
+
+    // 수직 FOV 범위를 벗어나면 원근 투영 왜곡 방지를 위해 가시성 제외
+    if (Math.abs(relativeAngleY) > fovY / 2) {
+        return { visible: false };
+    }
+
+    // 화면 Y 좌표 투영 (화면 중심 = height/2)
+    var centerY = height / 2;
+    var y = centerY - (Math.tan(relativeAngleY * Math.PI / 180) / Math.tan((fovY / 2) * Math.PI / 180)) * centerY;
+
+    return { visible: true, x: x, y: y };
+}
+
+// 카메라 SVG 원 생성 함수
+function drawCamCircle(x, y, color) {
+    var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", x);
+    circle.setAttribute("cy", y);
+    circle.setAttribute("r", "5");
+    circle.setAttribute("fill", color);
+    camSVG.appendChild(circle);
+}
+
+// 카메라 AR 화면 투영 및 4가지 조건별 그리기
+function drawProjectedPoint() {
+    var rect = camSVG.getBoundingClientRect();
+    var width = rect.width;
+    var height = rect.height;
+    if (width <= 0 || height <= 0) return;
+
+    var centerX = width / 2;
+
+    camPoints.forEach(function(segment) {
+        // 1. 카메라 위치(CCPos)와 선분(p1~p2) 사이의 최소 거리가 범위(targetDistance) 이내인지 검사
+        var closestPt = getClosestPointOnSegment(
+            CCPos.lat, CCPos.lng,
+            segment.p1.getLat(), segment.p1.getLng(),
+            segment.p2.getLat(), segment.p2.getLng()
+        );
+        var minDistance = getDistanceMeter(CCPos.lat, CCPos.lng, closestPt.lat, closestPt.lng);
+        
+        // 최소 거리가 범위를 초과하면 패스
+        if (minDistance > targetDistance) return;
+
+        // 투영 좌표 및 화면 내 존재 여부(visible) 계산
+        var pt1 = projectLatLngToScreen(segment.p1, width, height, centerX, segment.avgDph);
+        var pt2 = projectLatLngToScreen(segment.p2, width, height, centerX, segment.avgDph);
+        //var pt1 = projectLatLngToScreen(segment.p1, width, height, centerX);
+        //var pt2 = projectLatLngToScreen(segment.p2, width, height, centerX);
+
+        // ----------------------------------------------------
+        // 조건 2: 두 점이 모두 화면 내에 있는 경우
+        // ----------------------------------------------------
+        if (pt1.visible && pt2.visible) {
+            lineDrawCam(pt1.x, pt1.y, pt2.x, pt2.y, segment.color);
+            drawCamCircle(pt1.x, pt1.y, segment.color);
+            drawCamCircle(pt2.x, pt2.y, segment.color);
+        }
+        // ----------------------------------------------------
+        // 조건 3-1: p1만 화면 내에 있고, p2는 바깥인 경우
+        // ----------------------------------------------------
+        else if (pt1.visible && !pt2.visible) {
+            drawCamCircle(pt1.x, pt1.y, segment.color);
+            
+            // p1 -> p2 방향으로 가상점 탐색 후 화면 경계까지 연장
+            var tempPt = findCamTempPoint(segment.p1, segment.p2, width, height, centerX);
+            if (tempPt) {
+                var dx = tempPt.x - pt1.x;
+                var dy = tempPt.y - pt1.y;
+                var edge = extendCamToEdge(pt1.x, pt1.y, dx, dy, width, height);
+                lineDrawCam(pt1.x, pt1.y, edge.x, edge.y, segment.color);
+            }
+        }
+        // ----------------------------------------------------
+        // 조건 3-2: p2만 화면 내에 있고, p1은 바깥인 경우
+        // ----------------------------------------------------
+        else if (!pt1.visible && pt2.visible) {
+            drawCamCircle(pt2.x, pt2.y, segment.color);
+
+            // p2 -> p1 방향으로 가상점 탐색 후 화면 경계까지 연장
+            var tempPt = findCamTempPoint(segment.p2, segment.p1, width, height, centerX);
+            if (tempPt) {
+                var dx = tempPt.x - pt2.x;
+                var dy = tempPt.y - pt2.y;
+                var edge = extendCamToEdge(pt2.x, pt2.y, dx, dy, width, height);
+                lineDrawCam(pt2.x, pt2.y, edge.x, edge.y, segment.color);
+            }
+        }
+        // ----------------------------------------------------
+        // 조건 4: 두 점 모두 화면 바깥에 있는 경우
+        // ----------------------------------------------------
+        else if (!pt1.visible && !pt2.visible) {
+            // 선분이 화면을 관통하는지 검사하기 위해 2개의 가상점 탐색
+            var tempPair = findCamTempPointPair(segment.p1, segment.p2, width, height, centerX);
+            if (tempPair.pt1 && tempPair.pt2) {
+                var dx = tempPair.pt1.x - tempPair.pt2.x;
+                var dy = tempPair.pt1.y - tempPair.pt2.y;
+
+                // 두 가상점을 잇는 방향으로 양쪽 화면 경계까지 연장
+                var edge1 = extendCamToEdge(tempPair.pt1.x, tempPair.pt1.y, dx, dy, width, height);
+                var edge2 = extendCamToEdge(tempPair.pt2.x, tempPair.pt2.y, -dx, -dy, width, height);
+
+                lineDrawCam(edge1.x, edge1.y, edge2.x, edge2.y, segment.color);
+            }
+        }
+    });
+}
+
+// ----------------------------------------------------
+// 보조 함수 1: 단일 가상점 찾기 (내분점 탐색)
+// ----------------------------------------------------
+function findCamTempPoint(fromPath, toPath, width, height, centerX) {
+    var ratios = [0.8, 0.5, 0.2, 0.05];
+    for (var i = 0; i < ratios.length; i++) {
+        var point = getPointAtRatio(fromPath, toPath, ratios[i]);
+        var proj = projectLatLngToScreen(point, width, height, centerX);
+        if (proj.visible) {
+            return { x: proj.x, y: proj.y };
+        }
+    }
+    return null;
+}
+
+// ----------------------------------------------------
+// 보조 함수 2: 양쪽 가상점 쌍 찾기 (관통 처리용)
+// ----------------------------------------------------
+function findCamTempPointPair(p1, p2, width, height, centerX) {
+    var ratios = [0.1, 0.3, 0.5, 0.7, 0.9];
+    var v1 = null, v2 = null;
+
+    for (var i = 0; i < ratios.length; i++) {
+        var point1 = getPointAtRatio(p1, p2, ratios[i]);
+        var proj1 = projectLatLngToScreen(point1, width, height, centerX);
+        if (proj1.visible) {
+            v1 = { x: proj1.x, y: proj1.y };
+            break;
+        }
+    }
+
+    for (var i = 0; i < ratios.length; i++) {
+        var point2 = getPointAtRatio(p2, p1, ratios[i]);
+        var proj2 = projectLatLngToScreen(point2, width, height, centerX);
+        if (proj2.visible) {
+            v2 = { x: proj2.x, y: proj2.y };
+            break;
+        }
+    }
+
+    return { pt1: v1, pt2: v2 };
+}
+
+// ----------------------------------------------------
+// 보조 함수 3: 방향 벡터 기준 화면 테두리 끝점 연장
+// ----------------------------------------------------
+function extendCamToEdge(x1, y1, dx, dy, width, height) {
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.000001) return { x: x1, y: y1 };
+
+    dx /= len;
+    dy /= len;
+
+    var candidates = [];
+
+    if (dx > 0) {
+        var t = (width - x1) / dx;
+        var y = y1 + dy * t;
+        if (t >= 0 && y >= 0 && y <= height) candidates.push({ t: t, x: width, y: y });
+    }
+    if (dx < 0) {
+        var t = (0 - x1) / dx;
+        var y = y1 + dy * t;
+        if (t >= 0 && y >= 0 && y <= height) candidates.push({ t: t, x: 0, y: y });
+    }
+    if (dy > 0) {
+        var t = (height - y1) / dy;
+        var x = x1 + dx * t;
+        if (t >= 0 && x >= 0 && x <= width) candidates.push({ t: t, x: x, y: height });
+    }
+    if (dy < 0) {
+        var t = (0 - y1) / dy;
+        var x = x1 + dx * t;
+        if (t >= 0 && x >= 0 && x <= width) candidates.push({ t: t, x: x, y: 0 });
+    }
+
+    if (candidates.length === 0) return { x: x1, y: y1 };
+    candidates.sort(function(a, b) { return b.t - a.t; });
+
+    return { x: candidates[0].x, y: candidates[0].y };
+}
+
+// ----------------------------------------------------
+// 보조 함수 4: 카메라 전용 SVG 선 그리기
+// ----------------------------------------------------
+function lineDrawCam(x1, y1, x2, y2, color) {
+    var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1.toFixed(1));
+    line.setAttribute('y1', y1.toFixed(1));
+    line.setAttribute('x2', x2.toFixed(1));
+    line.setAttribute('y2', y2.toFixed(1));
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', '3');
+    line.setAttribute('opacity', '0.85');
+    camSVG.appendChild(line);
 }

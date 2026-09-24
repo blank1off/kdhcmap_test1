@@ -110,7 +110,7 @@
     <body>
         <div id="box1">
             <div id ="ui">
-                <!--<input type="file" id="csvFile" accept=".csv">-->
+                <input type="file" id="csvFile" accept=".csv">
                 <button id="normalBtn" class="btn" onclick="setMapType('normal')">일반</button>
                 <button id="satelliteBtn" class="btn" onclick="setMapType('satellite')">위성</button>
                 <button id="myLocationBtn" class="btn" onclick="moveToMyLocation()">내위치</button>
@@ -148,7 +148,7 @@
             var camStream = null;
             var camUpdateTimer = null;
 
-            /*// ★ 데이터 불러오기 중요 로컬에서 임시로 사용
+            // ★ 데이터 불러오기 중요 로컬에서 임시로 사용
             const fileInput = document.getElementById('csvFile');
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
@@ -160,7 +160,7 @@
                     parsePPgroup(csvText);
                 };
                 reader.readAsText(file, 'utf-8');
-            });*/
+            });
 
             kakao.maps.load(function() {// 처음 시작시
                 // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
@@ -396,11 +396,20 @@
 
                 if (camView) camView.srcObject = null;
             }
+            // deviceorientation 이벤트 발생 시 pitch(beta) 값 수집 추가
             function camEvent(event) {
                 if (cMode !== "cam") return;
-                if (camSVG) camSVG.replaceChildren(); // 회전 시 기존 SVG 초기화
-                if (camUpdateTimer) clearTimeout(camUpdateTimer);
-                camUpdateTimer = setTimeout(function() {camUpdate(event);}, 50);
+                
+                // 스마트폰 기울기(Pitch) 수집 (기본 세로 모드 기준 beta 사용)
+                if (event.beta != null) {
+                    // 스마트폰을 수직으로 세웠을 때(90도)를 Pitch 0도로 맞춤
+                    devicePitch = event.beta - 90; 
+                }
+                PPGcamUpdate(event);
+
+                //if (camSVG) camSVG.replaceChildren();
+                //if (camUpdateTimer) clearTimeout(camUpdateTimer);
+                //camUpdateTimer = setTimeout(function() { camUpdate(event); }, 50);
             }
             function camUpdate(event) {
                 PPGcamUpdate(event);
