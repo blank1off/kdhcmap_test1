@@ -629,6 +629,9 @@ var camPosition = null;
 var CAMERA_FOV = 60;
 
 function PPGcamUpdate(event){
+    // 기존 점 삭제
+    camSVG.replaceChildren();
+
     var heading = null;
 
     // iPhone / iPad 계열
@@ -641,7 +644,6 @@ function PPGcamUpdate(event){
     }
 
     if (heading == null) return;
-    console.log(heading)
 
     getCurrentLocation();// 현재 카메라 위치 
 
@@ -653,37 +655,17 @@ function PPGcamUpdate(event){
     var lat = camPosition.lat;
     var lng = camPosition.lng;
 
-    // 기존 점 삭제
-    camSVG.replaceChildren();
-
     // 북쪽 3m
     var point3m = getPointByDistance(lat, lng, 0, 3);
 
     // 북쪽 5m
     var point5m = getPointByDistance(lat, lng, 0, 5);
 
-    console.log("카메라 위치:", lat, lng);
-    console.log("카메라 방향:", heading);
 
-    console.log("북쪽 3m:", point3m.getLat(), point3m.getLng());
-    console.log("북쪽 5m:", point5m.getLat(), point5m.getLng());
-
-    drawCamPoint(
-        camSVG,
-        point3m,
-        3,
-        "3m"
-    );
-
-    drawCamPoint(
-        camSVG,
-        point5m,
-        5,
-        "5m"
-    );
+    drawProjectedPoint(camSVG,point3m,3,heading);
+    drawProjectedPoint(camSVG,point5m,5,heading);
 }
-function drawCamPoint(svg, point, distance, text) {
-
+function testCamPoint(svg, distance) {
     var rect = svg.getBoundingClientRect();
 
     var width = rect.width;
@@ -706,18 +688,8 @@ function drawCamPoint(svg, point, distance, text) {
     circle.setAttribute("cy", y);
     circle.setAttribute("r", 10);
 
-    circle.setAttribute(
-        "data-distance",
-        distance
-    );
-
+    circle.setAttribute("data-distance",distance);
     svg.appendChild(circle);
-
-    console.log(
-        text,
-        point.getLat(),
-        point.getLng()
-    );
 }
 function getPointByDistance(lat, lng, bearing, distance) {
 
@@ -770,5 +742,76 @@ function getCurrentLocation() {
             maximumAge: 1000,
             timeout: 10000
         }
+    );
+}
+function drawProjectedPoint(svg, point, distance, heading) {
+
+    var rect = svg.getBoundingClientRect();
+
+    var width = rect.width;
+    var height = rect.height;
+
+    var centerX = width / 2;
+    var centerY = height / 2;
+
+    // 점의 방위각
+    var bearing = getBearing(
+        camPosition.lat,
+        camPosition.lng,
+        point.getLat(),
+        point.getLng()
+    );
+
+    // 카메라 정면을 기준으로 한 각도
+    var relativeAngle = bearing - heading;
+
+    // -180 ~ +180
+    while (relativeAngle > 180) {
+        relativeAngle -= 360;
+    }
+
+    while (relativeAngle < -180) {
+        relativeAngle += 360;
+    }
+
+    // 화면 밖이면 표시하지 않음
+    if (
+        relativeAngle < -CAMERA_FOV / 2 ||
+        relativeAngle > CAMERA_FOV / 2
+    ) {
+        return;
+    }
+
+    // 화면 X 위치
+    var x =
+        centerX +
+        (relativeAngle / (CAMERA_FOV / 2)) *
+        centerX;
+
+    // 일단 Y는 화면 중앙
+    var y = centerY;
+
+    var circle = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "circle"
+    );
+
+    circle.setAttribute("cx", x);
+    circle.setAttribute("cy", y);
+    circle.setAttribute("r", 10);
+
+    circle.setAttribute(
+        "data-distance",
+        distance
+    );
+
+    svg.appendChild(circle);
+
+    console.log(
+        distance + "m",
+        "bearing =", bearing,
+        "heading =", heading,
+        "relative =", relativeAngle,
+        "screen =", x, y
     );
 }
