@@ -217,8 +217,8 @@ var camMH = [];
 
 function MHcamUpdate(event){
     //가짜 camPosition 만들기
-    var tlat = 37.369932982787454;
-    var tlng = 127.10797640931209;
+    var tlat = 37.36990553273216;
+    var tlng = 127.10843471960456;
     // GPS 수신 함수 대신 가짜 위치 전달
     CCPos = {lat: tlat, lng: tlng};
 
