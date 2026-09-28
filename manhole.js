@@ -4,10 +4,10 @@ var overMH = [];
 var rvOverMH = [];
 
 // 맨홀 마커 이미지 설정 (이미지 경로 및 크기 지정)
-var mhImageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png'; // 사용할 맨홀 이미지 경로
-var mhImageSize = new kakao.maps.Size(24, 35);
-var mhImageOption = { offset: new kakao.maps.Point(12, 35) };
-var mhMarkerImage = new kakao.maps.MarkerImage(mhImageSrc, mhImageSize, mhImageOption);
+var mhImageSrc = null;
+var mhImageSize = null;
+var mhImageOption = null;
+var mhMarkerImage = null;
 
 // CSV 파일 읽어오기
 function loadMH(filePath) {
@@ -53,6 +53,12 @@ function parseMH(csvText) {
             console.error(i + "번째 행 맨홀 좌표 변환 실패:", e);
         }
     }
+    //
+    mhImageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png'; // 사용할 맨홀 이미지 경로
+    mhImageSize = new kakao.maps.Size(24, 35);
+    mhImageOption = { offset: new kakao.maps.Point(12, 35) };
+    mhMarkerImage = new kakao.maps.MarkerImage(mhImageSrc, mhImageSize, mhImageOption);
+
     updateMH();
 }
 
