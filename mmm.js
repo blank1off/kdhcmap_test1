@@ -1,7 +1,8 @@
 var all_PPG = [];
 var on_PPG = [];
-var Poly_ = []; 
-var mapOver_ = [];
+
+var mapPPG_poly = []; 
+var mapPPG_label = [];
 
 var all_MH = [];
 
@@ -88,30 +89,23 @@ function parsePPG(csvText) {
             console.error(i + "번째 행 좌표 변환 실패:", e);
         }
     }
-    PPG_map();
+    map_PPG();
 }
 
-function PPG_map(){
-    clearPPG();
-    drawPPG();
-    labelPPG();
-}
-
-// 배관 관련 그래픽 요소를 화면에서 제거
-function clearPPG() {
-    for (var idx = 0; idx < mapOver_.length; idx++) {
-        mapOver_[idx].setMap(null);
+function map_PPG(){
+    // 배관 관련 그래픽 요소를 화면에서 제거
+    for (var idx = 0; idx < mapPPG_label.length; idx++) {
+        mapPPG_label[idx].setMap(null);
     }
-    for (var idx = 0; idx < Poly_.length; idx++) {
-        Poly_[idx].setMap(null);
+    for (var idx = 0; idx < mapPPG_poly.length; idx++) {
+        mapPPG_poly[idx].setMap(null);
     }
-    mapOver_ = [];
-    Poly_ = [];
+    mapPPG_label = [];
+    mapPPG_poly = [];
     on_PPG = [];
-}
 
-// 지도 레벨/영역 조건에 맞는 배관 선 그리기
-function drawPPG() {
+
+    // 지도 레벨/영역 조건에 맞는 배관 선 그리기
     if (!map || all_PPG.length === 0) return;
     if (map.getLevel() >= 5) return;
 
@@ -133,13 +127,12 @@ function drawPPG() {
             });
 
             poly.setMap(map);
-            Poly_.push(poly);
+            mapPPG_poly.push(poly);
             on_PPG.push(PPG);
         }
     }
-}
-// 그룹화 알고리즘 및 라벨 표출
-function labelPPG() {
+
+    // 그룹화 알고리즘 및 라벨 표출
     if (map.getLevel() >= 3) return;
     if (on_PPG.length === 0) return;
 
@@ -183,13 +176,22 @@ function labelPPG() {
         //if (ttPPG.srCode === 'R') continue; //극단적
         //var midCoordIndex = Math.floor(ttPPG.path.length / 2);
         //var midCoordIndex = Math.ceil(ttPPG.coords.length / 2);
-        var midCoordIndex = Math.round(ttPPG.coords.length / 2);
+        //var midCoordIndex = Math.round(ttPPG.coords.length / 2);
         //if (ttPPG.srCode === 'R' && midCoordIndex >= 1) midCoordIndex -= 1;
-        var centerPosition = ttPPG.coords[midCoordIndex];
+        //var centerPosition = ttPPG.coords[midCoordIndex];
+
+        // 1. 인덱스 범위를 벗어나지 않도록 안전하게 midIndex 계산 (0 ~ length-1)
+        var midCoordIndex = Math.floor((ttPPG.coords.length - 1) / 2);
+
+        // 2. 비율 계산을 위한 두 지점(kakao.maps.LatLng) 확보
+        var p1 = ttPPG.coords[midCoordIndex];
+        var p2 = ttPPG.coords[midCoordIndex + 1] || p1; // 점이 1개뿐일 경우를 대비한 안전 장치
+        
 
         var overlay = null;
         if (ttPPG.srCode === 'S'){
-            var overlayContent = '<div class="pipe-s-label">' + ttPPG.diaCode + 'A</div>';
+            var centerPosition = getPointAtRatio(p1, p2, 0.1)
+            var overlayContent = '<div class="mapPPG-s-label">' + ttPPG.diaCode + 'A</div>';
             overlay = new kakao.maps.CustomOverlay({
                 position: centerPosition,
                 content: overlayContent,
@@ -198,7 +200,8 @@ function labelPPG() {
             });
         }
         if (ttPPG.srCode === 'R'){
-            var overlayContent = '<div class="pipe-r-label">' + ttPPG.diaCode + 'A</div>';
+            var centerPosition = getPointAtRatio(p1, p2, 0.9)
+            var overlayContent = '<div class="mapPPG-r-label">' + ttPPG.diaCode + 'A</div>';
             overlay = new kakao.maps.CustomOverlay({
                 position: centerPosition,
                 content: overlayContent,
@@ -207,8 +210,11 @@ function labelPPG() {
             });
         }
 
-        overlay.setMap(map);
-        mapOver_.push(overlay);
+        // 3. overlay가 정상적으로 생성된 경우에만 지도에 표시
+        if (overlay) {
+            overlay.setMap(map);
+            mapPPG_label.push(overlay);
+        }
     }
 }
 

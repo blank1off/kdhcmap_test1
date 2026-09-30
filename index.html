@@ -67,15 +67,38 @@
             pointer-events: none; /* 클릭 이벤트 투과 */
         }
         /* 맵의 배관 관경 라벨 스타일 */
-        .pipe-s-label {
+        .mapPPG-s-label {
             font-size: 10px; font-weight: bold;
             color: #ff0000;
             white-space: nowrap;
         }
-        .pipe-r-label {
+        .mapPPG-r-label {
             font-size: 10px; font-weight: bold;
             color: #ffa000;
             white-space: nowrap;
+        }
+        /* 로드뷰 배관 라벨 스타일 */
+        .road-pipe-label {
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: rgba(0, 0, 0, 0.7);
+            white-space: nowrap;
+            border: 1px solid #ffffff;
+        }
+        .road-label-s {
+            border-color: #ff0000;
+            color: #ff9999;
+        }
+        .road-label-r {
+            border-color: #ffa000;
+            color: #ffeb3b;
+        }
+        .road-label-default {
+            border-color: #cccccc;
+            color: #ffffff;
         }
     </style>
 </head>
@@ -159,7 +182,7 @@
                 localStorage.setItem('last_lng', center.getLng());
                 localStorage.setItem('last_level', level);
 
-                PPG_map();
+                map_PPG();
                 //MH_map();
             });
 

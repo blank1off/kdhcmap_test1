@@ -2,11 +2,12 @@ var roadUpdateTimer = null;
 var roadRect = null;
 var roadWt = null;
 var roadHt = null;
+var roadDistance = 30;
 
-var PPG_roadOver_ = [];
+var roadPPG_over = [];
+var roadPipe_ = [];
+var roadPPG_label = [];
 
-var pipe_ = [];
-var PPG_road_Dt = 30;
 
 function openRoadView(position) {
     cMode = "road";
@@ -41,29 +42,32 @@ function closeRoadView() {
 
 function roadEvent() {
     if (cMode !== "road") return;
-    if (roadSVG) roadSVG.replaceChildren();//줌 회전시 선 안보임
+    if (roadSVG) roadSVG.replaceChildren();//줌, 회전시 선 안보임
+    if (roadSVG) roadSVG.innerHTML = '';
     if (roadUpdateTimer) clearTimeout(roadUpdateTimer);
     // 50ms 이내 연달아 들어오는 이벤트 중 마지막 1회만 실행
     roadUpdateTimer = setTimeout(function() {roadUpdate();}, 50); 
 }
 function roadUpdate() {
-    PPG_road();
+    road_PPG();
     // 프레임 지연으로 DOM 레이아웃 확정 보장
     requestAnimationFrame(function() {
         drawSvgPPG();
     });
 }
 
-function PPG_road() {
-    if (roadSVG) roadSVG.replaceChildren();
-    if (roadSVG) roadSVG.innerHTML = '';
-
-    for (var i = 0; i < PPG_roadOver_.length; i++) {
-        PPG_roadOver_[i].setMap(null);
+function road_PPG() {
+    // 배관 관련 그래픽 요소를 화면에서 제거
+    for (var idx = 0; idx < roadPPG_label.length; idx++) {
+        roadPPG_label[idx].setMap(null);
     }
-    PPG_roadOver_ = [];
+    for (var i = 0; i < roadPPG_over.length; i++) {
+        roadPPG_over[i].setMap(null);
+    }
+    roadPPG_label = [];
+    roadPPG_over = [];
+    roadPipe_ = [];
 
-    pipe_ = [];
     var cPos = roadView.getPosition(); 
     if (!cPos) return;
     var cLat = cPos.getLat();
@@ -83,7 +87,7 @@ function PPG_road() {
             );
 
             var distance = getDistanceMeter(cLat, cLng, closestPt.lat, closestPt.lng);
-            if (distance > PPG_road_Dt) continue;
+            if (distance > roadDistance) continue;
         
             var element1 = makePPGpoint(pos1, id0, id1, PPG);
             var element2 = makePPGpoint(pos2, id0, id1+1, PPG);
@@ -92,7 +96,8 @@ function PPG_road() {
             if (PPG.srCode === 'S') color = '#FF0000';
             if (PPG.srCode === 'R') color = '#FFA000';
 
-            pipe_.push({
+            roadPipe_.push({
+                id0: id0,           // ★ PPG 식별 ID 추가
                 el1: element1,
                 el2: element2,
                 pos1: pos1,
@@ -105,6 +110,7 @@ function PPG_road() {
         }
     });
 }
+
 
 // 오버레이 생성 후 객체/DOM 참조 반환
 function makePPGpoint(pos, PPGidx, pointIdx, PPG) {
@@ -127,14 +133,14 @@ function makePPGpoint(pos, PPGidx, pointIdx, PPG) {
     });    
 
     overlay.setMap(roadView);
-    PPG_roadOver_.push(overlay);
+    roadPPG_over.push(overlay);
 
     return element
 }
 
 function drawSvgPPG() {
     console.log("drawSvgPPG")
-    if (!roadSVG || !pipe_) return;
+    if (!roadSVG || !roadPipe_) return;
     roadRect = roadSVG.getBoundingClientRect();
     roadWt = roadRect.width;
     roadHt = roadRect.height;
@@ -143,7 +149,7 @@ function drawSvgPPG() {
     roadSVG.setAttribute('height', roadHt);
     roadSVG.setAttribute('viewBox', '0 0 ' + roadWt + ' ' + roadHt);
 
-    pipe_.forEach(function(pipe) {
+    roadPipe_.forEach(function(pipe) {
 
         //isVisiblePipe(pipe);
         var margin = 1;// 화면 안쪽에 있는지 검사시 여유값
@@ -208,7 +214,44 @@ function drawSvgPPG() {
             }
         }
     });
+
+    // 2. ★ id0별 대표 선분 1개 골라 SVG 라벨 그리기
+    var drawnLabelIds = {}; // 이미 그려진 id0 기록
+
+    roadPipe_.forEach(function(pipe) {
+        if (drawnLabelIds[pipe.id0]) return; // 이미 그렸다면 스킵
+
+        // ★ id0 값으로 all_PPG에서 대상 PPG 객체 가져오기
+        var PPG = all_PPG[pipe.id0];
+        if (!PPG) return;
+
+        var centerPos = getPointAtRatio(pipe.pos1, pipe.pos2, 0.5); // 중간 지점 좌표
+
+        // PPG 속성 추출
+        var pipeName = PPG.eqpId || PPG.cntrwkNm || '배관';
+        var labelText = pipeName + ' (' + (PPG.diaCode || '') + 'A)';
+
+        // CSS 클래스 분기 (S: 빨강, R: 주황, 기타: 회색)
+        var labelClass = 'road-label-default';
+        if (PPG.srCode === 'S') labelClass = 'road-label-s';
+        else if (PPG.srCode === 'R') labelClass = 'road-label-r';
+
+        var content = '<div class="road-pipe-label ' + labelClass + '">' + labelText + '</div>';
+
+        var overlay = new kakao.maps.CustomOverlay({
+            position: centerPos,
+            content: content,
+            xAnchor: 0.5,
+            yAnchor: 0.5
+        });
+
+        overlay.setMap(roadView);
+        roadPPG_label.push(overlay); // 배열에 추가하여 다음 화면 업데이트 시 함께 제거되도록 설정
+
+        drawnLabelIds[pipe.id0] = true; // 처리 완료 표기
+    });
 }
+
 
 function lineDraw(x1, y1, x2, y2, color){
     var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
