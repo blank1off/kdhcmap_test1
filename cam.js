@@ -21,24 +21,9 @@ async function openCamView() {
     document.getElementById("camBox").style.display = 'block';
     document.getElementById('closeCamBtn').style.display = 'block';
 
-    // ★ 화면 왼쪽 상단 각도/방향 표시 오버레이 생성 또는 켜기
-    var infoDiv = document.getElementById('camStatusOverlay');
-    if (!infoDiv) {
-        infoDiv = document.createElement('div');
-        infoDiv.id = 'camStatusOverlay';
-        infoDiv.style.position = 'absolute';
-        infoDiv.style.top = '10px';
-        infoDiv.style.left = '10px';
-        infoDiv.style.zIndex = '1000';
-        infoDiv.style.padding = '6px 10px';
-        infoDiv.style.background = 'rgba(0, 0, 0, 0.6)';
-        infoDiv.style.color = '#ffffff';
-        infoDiv.style.fontSize = '12px';
-        infoDiv.style.borderRadius = '4px';
-        infoDiv.style.pointerEvents = 'none'; // 터치 이벤트 방해 금지
-        document.getElementById('camBox').appendChild(infoDiv);
-    }
-    infoDiv.style.display = 'block';
+    // ★ 오버레이 표시
+    var statusOverlay = document.getElementById('camStatusOverlay');
+    if (statusOverlay) statusOverlay.style.display = 'block';
 
     try {
         camStream = await navigator.mediaDevices.getUserMedia({
@@ -81,9 +66,9 @@ function closeCamView() {
     document.getElementById('roadModeBtn').style.display = 'block';
     document.getElementById('openCamBtn').style.display = 'block';
 
-    // ★ 상태 표시 오버레이 숨기기
-    var infoDiv = document.getElementById('camStatusOverlay');
-    if (infoDiv) infoDiv.style.display = 'none';
+    // ★ 오버레이 숨기기
+    var statusOverlay = document.getElementById('camStatusOverlay');
+    if (statusOverlay) statusOverlay.style.display = 'none';
 
     // 센서 이벤트 해제 (자원 절약)
     window.removeEventListener("deviceorientationabsolute", camEvent, true);
@@ -163,12 +148,12 @@ function camUpdate(event) {
 
     heading = smoothHeading;
 
-    // ★ 화면 왼쪽 상단 오버레이에 현재 방향과 각도 실시간 갱신
-    var infoDiv = document.getElementById('camStatusOverlay');
-    if (infoDiv) {
+    // ★ 오버레이 텍스트 실시간 업데이트
+    var statusOverlay = document.getElementById('camStatusOverlay');
+    if (statusOverlay) {
         var dirVal = Math.round(heading);
         var pitchVal = Math.round(devicePitch);
-        infoDiv.innerHTML = '방향: ' + dirVal + '° | 각도: ' + pitchVal + '°';
+        statusOverlay.textContent = '방향: ' + dirVal + '° | 각도: ' + pitchVal + '°';
     }
 
     camSVG.replaceChildren();// 기존 점 삭제
