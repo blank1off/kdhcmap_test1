@@ -1,510 +1,259 @@
 <!DOCTYPE html>
 <html lang="ko">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>KDHC 현장도우미</title>
-        <style>
-            body {
-                margin: 0;
-            }
-            #box1 {
-                width: 100%;
-                height: 100vh;
-                position: relative;
-            }
-            #ui {
-                position: absolute;
-                top: 10px; right: 10px;
-                z-index: 100;
-                display: flex;
-                gap: 1px;
-            }
-            #map {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 1;
-            }
-            #roadBox {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 2;
-                display: none;
-            }
-            #roadView {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 3;
-            }
-            #roadSVG {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 4;
-                pointer-events: none; /* 클릭 이벤트 투과 */
-            }
-            #camBox {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 2;
-                display: none;
-            }
-            #camView {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 3;
-            }
-            #camSVG {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 4;
-                pointer-events: none; /* 클릭 이벤트 투과 */
-            }
-
-            /* 배관 관경 라벨 스타일 */
-            .pipe-s-label {
-                font-size: 10px;
-                font-weight: bold;
-                color: #ff0000;
-                white-space: nowrap;
-            }
-            .pipe-r-label {
-                font-size: 10px;
-                font-weight: bold;
-                color: #ffa000;
-                white-space: nowrap;
-            }
-
-            /* 로드뷰 좌표 오버레이 공통 스타일 */
-            .road-point-overlay {
-                padding: 3px 6px;
-                border-radius: 50%;
-                font-size: 10px;
-                font-weight: bold;
-                color: #ffffff;
-                text-align: center;
-                box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.4);
-                white-space: nowrap;
-            }
-
-            /* S관(공급관) 점 스타일 */
-            .road-point-overlay.road-s-point {
-                background-color: rgba(255, 0, 0, 0.85);
-                border: 1px solid #ffffff;
-            }
-
-            /* R관(회수관) 점 스타일 */
-            .road-point-overlay.road-r-point {
-                background-color: rgba(255, 160, 0, 0.85);
-                border: 1px solid #ffffff;
-            }
-
-            /* 맨홀 오버레이 전체 컨테이너 */
-            .mh-overlay {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                cursor: pointer;
-            }
-
-            /* 맨홀 이미지 스타일 */
-            .mh-overlay img {
-                width: 24px;
-                height: 24px;
-            }
-
-            /* 맨홀 이름 라벨 스타일 */
-            .mh-label {
-                margin-top: 2px;
-                padding: 1px 4px;
-                background-color: rgba(255, 255, 255, 0.9);
-                border: 1px solid #333333;
-                border-radius: 3px;
-                font-size: 10px;
-                font-weight: bold;
-                color: #111111;
-                white-space: nowrap;
-                box-shadow: 0px 1px 3px rgba(0,0,0,0.3);
-            }
-
-        </style>
-    </head>
-    <body>
-        <div id="box1">
-            <div id ="ui">
-                <input type="file" id="csvFile1" accept=".csv">
-                <input type="file" id="csvFile2" accept=".csv">
-                <button id="normalBtn" class="btn" onclick="setMapType('normal')">일반</button>
-                <button id="satelliteBtn" class="btn" onclick="setMapType('satellite')">위성</button>
-                <button id="myLocationBtn" class="btn" onclick="moveToMyLocation()">내위치</button>
-                <button id="roadModeBtn" class="btn" onclick="roadMode()">거리뷰</button>
-                <button id="closeRoadBtn" class="btn" onclick="closeRoadview()" style="display: none;">로드뷰 닫기</button>
-                <button id="openCamBtn" onclick="openCamView()">카메라 열기</button>
-                <button id="closeCamBtn" onclick="closeCamView()" style="display: none;">카메라 닫기</button>
-            </div>
-            <div id="map"></div>
-            <div id="roadBox">
-                <div id="roadView"></div>
-                <svg id="roadSVG"></svg>
-            </div>
-            <div id="camBox">
-                <video id="camView" autoplay playsinline muted></video>
-                <svg id="camSVG"></svg>
-            </div>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDHC 현장도우미</title>
+    <style>
+        body {
+            margin: 0;
+        }
+        #box1 {
+            width: 100%; height: 100vh;
+            position: relative;
+        }
+        #ui {
+            position: absolute;
+            top: 10px; right: 10px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+        #map {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+        }
+        #roadBox {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 2;
+            display: none;
+        }
+        #roadView {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 3;
+        }
+        #roadSVG {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 4;
+            pointer-events: none; /* 클릭 이벤트 투과 */
+        }
+        #camBox {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 2;
+            display: none;
+        }
+        #camView {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 3;
+        }
+        #camSVG {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 4;
+            pointer-events: none; /* 클릭 이벤트 투과 */
+        }
+        /* 맵의 배관 관경 라벨 스타일 */
+        .pipe-s-label {
+            font-size: 10px; font-weight: bold;
+            color: #ff0000;
+            white-space: nowrap;
+        }
+        .pipe-r-label {
+            font-size: 10px; font-weight: bold;
+            color: #ffa000;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="box1">
+        <div id ="ui">
+            <input type="file" id="csvFile" accept=".csv">
+            <button id="normalBtn" class="btn" onclick="setMapType('normal')">일반</button>
+            <button id="satelliteBtn" class="btn" onclick="setMapType('satellite')">위성</button>
+            <button id="myLocationBtn" class="btn" onclick="moveToMyLocation()">내위치</button>
+            <button id="roadModeBtn" class="btn" onclick="roadMode()">거리뷰</button>
+            <button id="closeRoadBtn" class="btn" onclick="closeRoadView()" style="display: none;">로드뷰 닫기</button>
+            <button id="openCamBtn" onclick="openCamView()">카메라 열기</button>
+            <button id="closeCamBtn" onclick="closeCamView()" style="display: none;">카메라 닫기</button>
         </div>
-        <script src="pipeGroup.js"></script>
-        <script src="manhole.js"></script>
-        <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
-        <script>
-            var cMode = "map";
+        <div id="map"></div>
+        <div id="roadBox">
+            <div id="roadView"></div>
+            <svg id="roadSVG"></svg>
+        </div>
+        <div id="camBox">
+            <video id="camView" autoplay playsinline muted></video>
+            <svg id="camSVG"></svg>
+        </div>
+    </div>
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
+    <script src="mmm.js"></script>
+    <script src="road.js"></script>
+    <script src="cam.js"></script>
+    <script>
+        var cMode = "map";
 
-            var map;
-            var myLocationMarker = null;
+        var map;
+        var myLocationMarker = null;
 
-            var roadView;
-            var roadSVG;
-            var roadClient;
-            var roadOn_flag = false;
-            var roadUpdateTimer = null;
+        var roadView;
+        var roadSVG;
+        var roadClient;
+        var roadOn_flag = false;
 
-            var camView;
-            var camSVG;
-            var camStream = null;
-            var camUpdateTimer = null;
+        var camView;
+        var camSVG;
 
-            // ★ 데이터 불러오기 중요 로컬에서 임시로 사용
-            const fileInput1 = document.getElementById('csvFile1');
-            fileInput1.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+        // ★ 데이터 불러오기 중요 로컬에서 임시로 사용
+        const fileInput = document.getElementById('csvFile');
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const csvText = event.target.result;
-                    parsePPgroup(csvText);
-                };
-                reader.readAsText(file, 'utf-8');
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const csvText = event.target.result;
+                parsePPG(csvText);
+            };
+            reader.readAsText(file, 'utf-8');
+        });
+
+        kakao.maps.load(function() {// 처음 시작시
+            // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
+            var savedLat = localStorage.getItem('last_lat');
+            var savedLng = localStorage.getItem('last_lng');
+            var savedLevel = localStorage.getItem('last_level');
+
+            var initialCenter = (savedLat && savedLng) 
+                ? new kakao.maps.LatLng(parseFloat(savedLat), parseFloat(savedLng))
+                : new kakao.maps.LatLng(37.3797697, 127.1159946);// 기본값
+            var initialLevel = savedLevel ? parseInt(savedLevel, 10) : 3;
+
+            var initial = {center: initialCenter, level: initialLevel};
+
+            //map
+            map = new kakao.maps.Map(document.getElementById('map'), initial);
+            // 무반응 map.setMinLevel(0);// 지도의 최소 레벨을 0으로 설정하여 더 크게 확대 가능하도록 변경
+            // 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
+            kakao.maps.event.addListener(map, 'idle', function() {
+                if (!map) return;
+                var center = map.getCenter();
+                var level = map.getLevel();
+
+                localStorage.setItem('last_lat', center.getLat());
+                localStorage.setItem('last_lng', center.getLng());
+                localStorage.setItem('last_level', level);
+
+                PPG_map();
+                //MH_map();
             });
-            const fileInput2 = document.getElementById('csvFile2');
-            fileInput2.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
 
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const csvText = event.target.result;
-                    parseMH(csvText);
-                };
-                reader.readAsText(file, 'utf-8');
+            // 지도 클릭 이벤트 거리뷰 열기
+            kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+                if (roadOn_flag) openRoadView(mouseEvent.latLng);
             });
 
-            kakao.maps.load(function() {// 처음 시작시
-                // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
-                var savedLat = localStorage.getItem('last_lat');
-                var savedLng = localStorage.getItem('last_lng');
-                var savedLevel = localStorage.getItem('last_level');
+            //road
+            roadView = new kakao.maps.Roadview(document.getElementById('roadView'));
+            roadSVG = document.getElementById('roadSVG');
+            roadClient = new kakao.maps.RoadviewClient();
 
-                var initialCenter = (savedLat && savedLng) 
-                    ? new kakao.maps.LatLng(parseFloat(savedLat), parseFloat(savedLng))
-                    : new kakao.maps.LatLng(37.3797697, 127.1159946);// 기본값
-                var initialLevel = savedLevel ? parseInt(savedLevel, 10) : 3;
-
-                var initial = {center: initialCenter, level: initialLevel};
-
-                //map
-                map = new kakao.maps.Map(document.getElementById('map'), initial);
-                // 무반응 map.setMinLevel(0);// 지도의 최소 레벨을 0으로 설정하여 더 크게 확대 가능하도록 변경
-                // 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
-                kakao.maps.event.addListener(map, 'idle', function() {
-                    if (!map) return;
-                    var center = map.getCenter();
-                    var level = map.getLevel();
-
-                    localStorage.setItem('last_lat', center.getLat());
-                    localStorage.setItem('last_lng', center.getLng());
-                    localStorage.setItem('last_level', level);
-
-                    updatePPgroup();
-                    updateMH();
-                });
-
-                // 지도 클릭 이벤트 거리뷰 열기
-                kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-                    if (roadOn_flag) openRoadview(mouseEvent.latLng);
-                });
-
-                //road
-                roadView = new kakao.maps.Roadview(document.getElementById('roadView'));
-                roadSVG = document.getElementById('roadSVG');
-                roadClient = new kakao.maps.RoadviewClient();
-
-                //로드뷰 이벤트
-                kakao.maps.event.addListener(roadView, 'viewpoint_changed', roadEvent);
-                kakao.maps.event.addListener(roadView, 'position_changed', roadEvent);
-                kakao.maps.event.addListener(roadView, 'panoid_changed', roadEvent);
-
-                //cam
-                camView = document.getElementById("camView");
-                camSVG = document.getElementById('camSVG');
-
-                // ★ 데이터 불러오기 중요 서버환경에서만 가능
-                loadPPgroup('bundang/pipe.csv');
-                loadMH('bundang/manhole.csv');
-            });
-            function allNone(){
-                document.getElementById('map').style.display = 'none';
-                document.getElementById('roadBox').style.display = 'none';
-                document.getElementById("camBox").style.display = 'none';
-
-                document.getElementById('normalBtn').style.display = 'none';
-                document.getElementById('satelliteBtn').style.display = 'none';
-                document.getElementById('myLocationBtn').style.display = 'none';
-                document.getElementById('roadModeBtn').style.display = 'none';
-                document.getElementById('closeRoadBtn').style.display = 'none';
-                document.getElementById('openCamBtn').style.display = 'none';
-                document.getElementById('closeCamBtn').style.display = 'none';
-
-            }
-
-            // 일반/위성 모드 전환
-            function setMapType(maptype) {
-                if (maptype === 'normal') map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-                else if (maptype === 'satellite') map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
-            }
-            // 스마트폰인지 확인
-            function isMobileDevice() {
-                return /Android|Phone|iPad|iPod/i.test(navigator.userAgent);
-            }
-            function moveToMyLocation() {
-                if (!navigator.geolocation) {
-                    alert("이 기기에서는 위치 정보를 사용할 수 없습니다.");
-                    return;
-                }
-
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        var lat = position.coords.latitude;
-                        var lng = position.coords.longitude;
-
-                        if (!map) {
-                            console.error("map이 아직 생성되지 않았습니다.");
-                            return;
-                        }
-
-                        var myPosition = new kakao.maps.LatLng(lat, lng);
-                        map.panTo(myPosition);// 지도 이동
-
-                        // 기존 내 위치 마커 제거
-                        if (myLocationMarker) {
-                            myLocationMarker.setMap(null);
-                        }
-
-                        // 내 위치 마커 생성
-                        myLocationMarker = new kakao.maps.Marker({
-                            position: myPosition
-                        });
-
-                        myLocationMarker.setMap(map);
-                    },
-                    function(error) {
-                        console.error("위치 가져오기 실패:", error);
-                        if (error.code === 1) alert("위치 권한이 허용되지 않았습니다.");
-                        else if (error.code === 2) alert("현재 위치를 확인할 수 없습니다.");
-                        else if (error.code === 3) alert("위치 확인 시간이 초과되었습니다.");
-                    },
-                    {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
-                );
-            }
-
-            // 거리뷰 모드 켜고 끄기
-            function roadMode() {
-                if (roadOn_flag == true){ 
-                    roadOn_flag = false;
-                    map.setCursor('grab');
-                    map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-                } else { 
-                    roadOn_flag = true;
-                    map.setCursor('crosshair');
-                    map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-                }
-            }
-
-            function openRoadview(position) {
-                cMode = "road";
-                allNone();
-                document.getElementById('roadBox').style.display = 'block';
-                document.getElementById('closeRoadBtn').style.display = 'block';
-
-                roadView.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
-
-                // 특정 위치의 좌표와 가까운 로드뷰의 panoId를 추출하여 로드뷰를 띄운다.
-                roadClient.getNearestPanoId(position, 50, function(panoId) {
-                    if (panoId === null) {
-                        alert('이 위치 주변에는 로드뷰를 지원하지 않습니다.');  
-                        closeRoadview();
-                        return;
-                    }
-                    roadView.setPanoId(panoId, position);
-                });
-            }
-            function closeRoadview() {
-                cMode = "map";
-                allNone();
-                document.getElementById('map').style.display = 'block';
-                document.getElementById('normalBtn').style.display = 'block';
-                document.getElementById('satelliteBtn').style.display = 'block';
-                document.getElementById('myLocationBtn').style.display = 'block';
-                document.getElementById('roadModeBtn').style.display = 'block';
-                document.getElementById('openCamBtn').style.display = 'block';
-
-                map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
-            }
-            // 연속 이벤트를 하나로 묶어주는 디바운스 함수
-            //로드뷰를 열면 roadUpdate 3번 발생
-            //로드 이동하면 roadUpdate 2번 발생
-            function roadEvent() {
-                if (cMode !== "road") return;
-                if (roadSVG) roadSVG.replaceChildren();//줌 회전시 선 안보임
-                if (roadUpdateTimer) clearTimeout(roadUpdateTimer);
-                // 50ms 이내 연달아 들어오는 이벤트 중 마지막 1회만 실행
-                roadUpdateTimer = setTimeout(function() {roadUpdate();}, 50); 
-            }
-            function roadUpdate() {
-                PPGroadUpdate();
-                drawRvMH();
-            }
+            //로드뷰 이벤트
+            kakao.maps.event.addListener(roadView, 'viewpoint_changed', roadEvent);
+            kakao.maps.event.addListener(roadView, 'position_changed', roadEvent);
+            kakao.maps.event.addListener(roadView, 'panoid_changed', roadEvent);
 
             //cam
-            async function openCamView() {
-                cMode = "cam";
-                allNone();
-                document.getElementById("camBox").style.display = 'block';
-                document.getElementById('closeCamBtn').style.display = 'block';
+            camView = document.getElementById("camView");
+            camSVG = document.getElementById('camSVG');
 
-                try {
-                    camStream = await navigator.mediaDevices.getUserMedia({
-                        video: {facingMode: {ideal: "environment"}},
-                        audio: false
+            // ★ 데이터 불러오기 중요 서버환경에서만 가능
+            loadPPG('bundang/PPG.csv');
+            //loadMH('bundang/MH.csv');
+        });
+
+        // 일반/위성 모드 전환
+        function setMapType(maptype) {
+            if (maptype === 'normal') map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+            else if (maptype === 'satellite') map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
+        }
+        // 거리뷰 모드 켜고 끄기
+        function roadMode() {
+            if (roadOn_flag == true){ 
+                roadOn_flag = false;
+                map.setCursor('grab');
+                map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+            } else { 
+                roadOn_flag = true;
+                map.setCursor('crosshair');
+                map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+            }
+        }
+        // 스마트폰인지 확인
+        function isMobileDevice() {
+            return /Android|Phone|iPad|iPod/i.test(navigator.userAgent);
+        }
+        function moveToMyLocation() {
+            if (!navigator.geolocation) {
+                alert("이 기기에서는 위치 정보를 사용할 수 없습니다.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+
+                    var myPosition = new kakao.maps.LatLng(lat, lng);
+                    map.panTo(myPosition);// 지도 이동
+
+                    // 기존 내 위치 마커 제거
+                    if (myLocationMarker) myLocationMarker.setMap(null);
+
+                    // 내 위치 마커 생성
+                    myLocationMarker = new kakao.maps.Marker({
+                        position: myPosition
                     });
 
-                    camView.srcObject = camStream;
+                    myLocationMarker.setMap(map);
+                },
+                function(error) {
+                    console.error("위치 가져오기 실패:", error);
+                    if (error.code === 1) alert("위치 권한이 허용되지 않았습니다.");
+                    else if (error.code === 2) alert("현재 위치를 확인할 수 없습니다.");
+                    else if (error.code === 3) alert("위치 확인 시간이 초과되었습니다.");
+                },
+                {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+            );
+        }
 
-                    // iOS 센서 권한 요청 및 이벤트 등록
-                    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                        DeviceOrientationEvent.requestPermission()
-                            .then(function(response) {
-                                if (response === 'granted') {
-                                    window.addEventListener("deviceorientation", camEvent, true);
-                                }
-                            })
-                            .catch(console.error);
-                    } else {
-                        // Android 및 기타 브라우저
-                        if ("ondeviceorientationabsolute" in window) {
-                            window.addEventListener("deviceorientationabsolute", camEvent, true);
-                        } else {
-                            window.addEventListener("deviceorientation", camEvent, true);
-                        }
-                    }
+        function allNone(){
+            document.getElementById('map').style.display = 'none';
+            document.getElementById('roadBox').style.display = 'none';
+            document.getElementById("camBox").style.display = 'none';
 
-                } catch (error) {
-                    console.error("카메라 실행 실패:", error);
-                    closeCamView();
-                }
-            }
-            function closeCamView() {
-                cMode = "map";
-                allNone();
-                document.getElementById('map').style.display = 'block';
-                document.getElementById('normalBtn').style.display = 'block';
-                document.getElementById('satelliteBtn').style.display = 'block';
-                document.getElementById('myLocationBtn').style.display = 'block';
-                document.getElementById('roadModeBtn').style.display = 'block';
-                document.getElementById('openCamBtn').style.display = 'block';
-
-                // 센서 이벤트 해제 (자원 절약)
-                window.removeEventListener("deviceorientationabsolute", camEvent, true);
-                window.removeEventListener("deviceorientation", camEvent, true);
-
-                if (camStream) {
-                    camStream.getTracks().forEach(function(track) {
-                        track.stop();
-                    });
-                    camStream = null;
-                }
-
-                if (camView) camView.srcObject = null;
-            }
-            // deviceorientation 이벤트 발생 시 pitch(beta) 값 수집 추가
-            function camEvent(event) {
-                if (cMode !== "cam") return;
-                
-                // 스마트폰 기울기(Pitch) 수집 (기본 세로 모드 기준 beta 사용)
-                if (event.beta != null) {
-                    // 스마트폰을 수직으로 세웠을 때(90도)를 Pitch 0도로 맞춤
-                    devicePitch = event.beta - 90; 
-                }
-                camUpdate(event);
-
-                //if (camSVG) camSVG.replaceChildren();
-                //if (camUpdateTimer) clearTimeout(camUpdateTimer);
-                //camUpdateTimer = setTimeout(function() { camUpdate(event); }, 50);
-            }
-            function camUpdate(event) {
-                PPGcamUpdate(event);
-                MHcamUpdate(event);
-            }
-
-
-            //좌표 수식 관련
-            // 점 P(lat, lng)에서 선분 AB(aLat, aLng ~ bLat, bLng)까지의 최단 좌표 H 구하기
-            function getClosestPointOnSegment(pLat, pLng, aLat, aLng, bLat, bLng) {
-                var dx = bLng - aLng;
-                var dy = bLat - aLat;
-
-                // A와 B가 동일한 점인 경우
-                if (dx === 0 && dy === 0) return { lat: aLat, lng: aLng };
-
-                // 선분 AB 상에서 P의 투영 위치 비율 t 계산
-                var t = ((pLng - aLng) * dx + (pLat - aLat) * dy) / (dx * dx + dy * dy);
-
-                // t 범위에 따른 최단점 선택
-                if (t <= 0) return { lat: aLat, lng: aLng };
-                if (t >= 1) return { lat: bLat, lng: bLng };
-
-                return {lat: aLat + t * dy, lng: aLng + t * dx};
-            }
-            // 두 좌표 간의 직선 거리(m) 계산 함수 (Haversine Formula)
-            function getDistanceMeter(lat1, lng1, lat2, lng2) {
-                var R = 6371000; // 지구 반지름 (m)
-                var dLat = (lat2 - lat1) * Math.PI / 180;
-                var dLng = (lng2 - lng1) * Math.PI / 180;
-                var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                        Math.sin(dLng / 2) * Math.sin(dLng / 2);
-                var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                return R * c;
-            }
-            // 두 지점 간 방위각 계산 함수 (0°~360°, 북쪽=0, 동쪽=90)
-            function getBearing(lat1, lng1, lat2, lng2) {
-                var radLat1 = lat1 * Math.PI / 180;
-                var radLat2 = lat2 * Math.PI / 180;
-                var dLng = (lng2 - lng1) * Math.PI / 180;
-
-                var y = Math.sin(dLng) * Math.cos(radLat2);
-                var x = Math.cos(radLat1) * Math.sin(radLat2) -
-                        Math.sin(radLat1) * Math.cos(radLat2) * Math.cos(dLng);
-
-                var bearing = Math.atan2(y, x) * 180 / Math.PI;
-                return (bearing + 360) % 360; // 0 ~ 360도로 정규화
-            }
-
-        </script>
-    </body>
-</html>
+            document.getElementById('normalBtn').style.display = 'none';
+            document.getElementById('satelliteBtn').style.display = 'none';
+            document.getElementById('myLocationBtn').style.display = 'none';
+            document.getElementById('roadModeBtn').style.display = 'none';
+            document.getElementById('closeRoadBtn').style.display = 'none';
+            document.getElementById('openCamBtn').style.display = 'none';
+            document.getElementById('closeCamBtn').style.display = 'none';
+        }
+    </script>
+</body>
