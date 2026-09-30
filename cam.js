@@ -13,6 +13,7 @@ var CAMERA_MAX_DISTANCE = 10;
 var CAMERA_FOV_X = 60; // 가로 FOV
 var CAMERA_HEIGHT = 1.5; // 스마트폰을 들고 있는 높이 (지면으로부터 약 1.5m)
 
+var targetDistance = 30;
 
 async function openCamView() {
     cMode = "cam";
@@ -89,6 +90,11 @@ function camEvent(event) {
     //camUpdateTimer = setTimeout(function() { camUpdate(event); }, 50);
 }
 function camUpdate(event) {
+    /*/가짜 camPosition 만들기
+    var tlat = 37.369932982787454;
+    var tlng = 127.10797640931209;
+    // GPS 수신 함수 대신 가짜 위치 전달
+    CCPos = {lat: tlat, lng: tlng};*/
     // 현재 카메라 위치
     navigator.geolocation.watchPosition(
         function(position) {
@@ -186,11 +192,11 @@ function drawProjectedPoint() {
     var centerX = width / 2;
 
     camPoints.forEach(function(segment) {
-        // 1. 카메라 위치(CCPos)와 선분(p1~p2) 사이의 최소 거리가 범위(targetDistance) 이내인지 검사
+        // 1. 카메라 위치(CCPos)와 선분(pos1~pos2) 사이의 최소 거리가 범위(targetDistance) 이내인지 검사
         var closestPt = getClosestPointOnLine(
             CCPos.lat, CCPos.lng,
-            segment.p1.getLat(), segment.p1.getLng(),
-            segment.p2.getLat(), segment.p2.getLng()
+            segment.pos1.getLat(), segment.pos1.getLng(),
+            segment.pos2.getLat(), segment.pos2.getLng()
         );
         var minDistance = getDistanceMeter(CCPos.lat, CCPos.lng, closestPt.lat, closestPt.lng);
         
@@ -198,10 +204,10 @@ function drawProjectedPoint() {
         if (minDistance > targetDistance) return;
 
         // 투영 좌표 및 화면 내 존재 여부(visible) 계산
-        var pt1 = projectLatLngToScreen(segment.p1, width, height, centerX, segment.avgDph);
-        var pt2 = projectLatLngToScreen(segment.p2, width, height, centerX, segment.avgDph);
-        //var pt1 = projectLatLngToScreen(segment.p1, width, height, centerX);
-        //var pt2 = projectLatLngToScreen(segment.p2, width, height, centerX);
+        var pt1 = projectLatLngToScreen(segment.pos1, width, height, centerX, segment.avgDph);
+        var pt2 = projectLatLngToScreen(segment.pos2, width, height, centerX, segment.avgDph);
+        //var pt1 = projectLatLngToScreen(segment.pos1, width, height, centerX);
+        //var pt2 = projectLatLngToScreen(segment.pos2, width, height, centerX);
 
         // ----------------------------------------------------
         // 조건 2: 두 점이 모두 화면 내에 있는 경우
@@ -212,13 +218,13 @@ function drawProjectedPoint() {
             drawCamCircle(pt2.x, pt2.y, segment.color);
         }
         // ----------------------------------------------------
-        // 조건 3-1: p1만 화면 내에 있고, p2는 바깥인 경우
+        // 조건 3-1: pos1만 화면 내에 있고, pos2는 바깥인 경우
         // ----------------------------------------------------
         else if (pt1.visible && !pt2.visible) {
             drawCamCircle(pt1.x, pt1.y, segment.color);
             
-            // p1 -> p2 방향으로 가상점 탐색 후 화면 경계까지 연장
-            var tempPt = findCamTempPoint(segment.p1, segment.p2, width, height, centerX);
+            // pos1 -> pos2 방향으로 가상점 탐색 후 화면 경계까지 연장
+            var tempPt = findCamTempPoint(segment.pos1, segment.pos2, width, height, centerX);
             if (tempPt) {
                 var dx = tempPt.x - pt1.x;
                 var dy = tempPt.y - pt1.y;
@@ -227,13 +233,13 @@ function drawProjectedPoint() {
             }
         }
         // ----------------------------------------------------
-        // 조건 3-2: p2만 화면 내에 있고, p1은 바깥인 경우
+        // 조건 3-2: pos2만 화면 내에 있고, pos1은 바깥인 경우
         // ----------------------------------------------------
         else if (!pt1.visible && pt2.visible) {
             drawCamCircle(pt2.x, pt2.y, segment.color);
 
-            // p2 -> p1 방향으로 가상점 탐색 후 화면 경계까지 연장
-            var tempPt = findCamTempPoint(segment.p2, segment.p1, width, height, centerX);
+            // pos2 -> pos1 방향으로 가상점 탐색 후 화면 경계까지 연장
+            var tempPt = findCamTempPoint(segment.pos2, segment.pos1, width, height, centerX);
             if (tempPt) {
                 var dx = tempPt.x - pt2.x;
                 var dy = tempPt.y - pt2.y;
@@ -246,7 +252,7 @@ function drawProjectedPoint() {
         // ----------------------------------------------------
         else if (!pt1.visible && !pt2.visible) {
             // 선분이 화면을 관통하는지 검사하기 위해 2개의 가상점 탐색
-            var tempPair = findCamTempPointPair(segment.p1, segment.p2, width, height, centerX);
+            var tempPair = findCamTempPointPair(segment.pos1, segment.pos2, width, height, centerX);
             if (tempPair.pt1 && tempPair.pt2) {
                 var dx = tempPair.pt1.x - tempPair.pt2.x;
                 var dy = tempPair.pt1.y - tempPair.pt2.y;
@@ -340,12 +346,12 @@ function findCamTempPoint(fromPath, toPath, width, height, centerX) {
 // ----------------------------------------------------
 // 보조 함수 2: 양쪽 가상점 쌍 찾기 (관통 처리용)
 // ----------------------------------------------------
-function findCamTempPointPair(p1, p2, width, height, centerX) {
+function findCamTempPointPair(pos1, pos2, width, height, centerX) {
     var ratios = [0.1, 0.3, 0.5, 0.7, 0.9];
     var v1 = null, v2 = null;
 
     for (var i = 0; i < ratios.length; i++) {
-        var point1 = getPointAtRatio(p1, p2, ratios[i]);
+        var point1 = getPointAtRatio(pos1, pos2, ratios[i]);
         var proj1 = projectLatLngToScreen(point1, width, height, centerX);
         if (proj1.visible) {
             v1 = { x: proj1.x, y: proj1.y };
@@ -354,7 +360,7 @@ function findCamTempPointPair(p1, p2, width, height, centerX) {
     }
 
     for (var i = 0; i < ratios.length; i++) {
-        var point2 = getPointAtRatio(p2, p1, ratios[i]);
+        var point2 = getPointAtRatio(pos2, pos1, ratios[i]);
         var proj2 = projectLatLngToScreen(point2, width, height, centerX);
         if (proj2.visible) {
             v2 = { x: proj2.x, y: proj2.y };
