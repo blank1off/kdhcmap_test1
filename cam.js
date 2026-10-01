@@ -164,6 +164,7 @@ function camUpdate(event) {
     });
 }
 
+// cam_2.js - PPG_cam() 수정
 function PPG_cam(){
     camPoints = [];
 
@@ -191,14 +192,50 @@ function PPG_cam(){
                     pos2: pos2,
                     color: color,
                     diaCode: PPG.diaCode,
-                    srCode: PPG.srCode
+                    srCode: PPG.srCode,
+                    avgDph: PPG.avgDph,
+                    eqpId: PPG.eqpId,
+                    cntrwkNm: PPG.cntrwkNm
                 });
             }
         }
     });
 }
 
-// 카메라 AR 화면 투영 및 4가지 조건별 그리기
+// cam_2.js - SVG 라벨 그리기 함수 추가
+function drawCamLabel(x, y, text, srCode) {
+    var labelClass = 'cam-label-default';
+    if (srCode === 'S') labelClass = 'cam-label-s';
+    else if (srCode === 'R') labelClass = 'cam-label-r';
+
+    // 텍스트 배경 상자 (가독성 향상)
+    var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    var paddingX = 12;
+    var paddingY = 6;
+    var textWidth = text.length * 7.5; // 대략적인 텍스트 너비 계산
+    var rectWidth = textWidth + paddingX;
+    var rectHeight = 20;
+
+    rect.setAttribute("x", x - rectWidth / 2);
+    rect.setAttribute("y", y - rectHeight / 2);
+    rect.setAttribute("width", rectWidth);
+    rect.setAttribute("height", rectHeight);
+    rect.setAttribute("rx", "4");
+    rect.setAttribute("fill", "rgba(0, 0, 0, 0.65)");
+    rect.setAttribute("stroke", srCode === 'S' ? '#FF0000' : (srCode === 'R' ? '#FFA000' : '#CCCCCC'));
+    rect.setAttribute("stroke-width", "1");
+    camSVG.appendChild(rect);
+
+    // 텍스트 라벨
+    var textNode = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    textNode.setAttribute("x", x);
+    textNode.setAttribute("y", y);
+    textNode.setAttribute("class", "cam-pipe-label " + labelClass);
+    textNode.textContent = text;
+    camSVG.appendChild(textNode);
+}
+
+// cam_2.js - drawProjectedPoint() 내 배관 그리기가 끝난 후 라벨 처리 로직 추가
 function drawProjectedPoint() {
     var rect = camSVG.getBoundingClientRect();
     var width = rect.width;
@@ -207,39 +244,26 @@ function drawProjectedPoint() {
 
     var centerX = width / 2;
 
+    // 1. 배관 및 점 선분 그리기
     camPoints.forEach(function(segment) {
-        // 1. 카메라 위치(CCPos)와 선분(pos1~pos2) 사이의 최소 거리가 범위(targetDistance) 이내인지 검사
         var closestPt = getClosestPointOnLine(
             CCPos.lat, CCPos.lng,
             segment.pos1.getLat(), segment.pos1.getLng(),
             segment.pos2.getLat(), segment.pos2.getLng()
         );
         var minDistance = getDistanceMeter(CCPos.lat, CCPos.lng, closestPt.lat, closestPt.lng);
-        
-        // 최소 거리가 범위를 초과하면 패스
         if (minDistance > targetDistance) return;
 
-        // 투영 좌표 및 화면 내 존재 여부(visible) 계산
         var pt1 = projectLatLngToScreen(segment.pos1, width, height, centerX, segment.avgDph);
         var pt2 = projectLatLngToScreen(segment.pos2, width, height, centerX, segment.avgDph);
-        //var pt1 = projectLatLngToScreen(segment.pos1, width, height, centerX);
-        //var pt2 = projectLatLngToScreen(segment.pos2, width, height, centerX);
 
-        // ----------------------------------------------------
-        // 조건 2: 두 점이 모두 화면 내에 있는 경우
-        // ----------------------------------------------------
         if (pt1.visible && pt2.visible) {
             lineDrawCam(pt1.x, pt1.y, pt2.x, pt2.y, segment.color);
             drawCamCircle(pt1.x, pt1.y, segment.color);
             drawCamCircle(pt2.x, pt2.y, segment.color);
         }
-        // ----------------------------------------------------
-        // 조건 3-1: pos1만 화면 내에 있고, pos2는 바깥인 경우
-        // ----------------------------------------------------
         else if (pt1.visible && !pt2.visible) {
             drawCamCircle(pt1.x, pt1.y, segment.color);
-            
-            // pos1 -> pos2 방향으로 가상점 탐색 후 화면 경계까지 연장
             var tempPt = findCamTempPoint(segment.pos1, segment.pos2, width, height, centerX);
             if (tempPt) {
                 var dx = tempPt.x - pt1.x;
@@ -248,13 +272,8 @@ function drawProjectedPoint() {
                 lineDrawCam(pt1.x, pt1.y, edge.x, edge.y, segment.color);
             }
         }
-        // ----------------------------------------------------
-        // 조건 3-2: pos2만 화면 내에 있고, pos1은 바깥인 경우
-        // ----------------------------------------------------
         else if (!pt1.visible && pt2.visible) {
             drawCamCircle(pt2.x, pt2.y, segment.color);
-
-            // pos2 -> pos1 방향으로 가상점 탐색 후 화면 경계까지 연장
             var tempPt = findCamTempPoint(segment.pos2, segment.pos1, width, height, centerX);
             if (tempPt) {
                 var dx = tempPt.x - pt2.x;
@@ -263,22 +282,35 @@ function drawProjectedPoint() {
                 lineDrawCam(pt2.x, pt2.y, edge.x, edge.y, segment.color);
             }
         }
-        // ----------------------------------------------------
-        // 조건 4: 두 점 모두 화면 바깥에 있는 경우
-        // ----------------------------------------------------
         else if (!pt1.visible && !pt2.visible) {
-            // 선분이 화면을 관통하는지 검사하기 위해 2개의 가상점 탐색
             var tempPair = findCamTempPointPair(segment.pos1, segment.pos2, width, height, centerX);
             if (tempPair.pt1 && tempPair.pt2) {
                 var dx = tempPair.pt1.x - tempPair.pt2.x;
                 var dy = tempPair.pt1.y - tempPair.pt2.y;
-
-                // 두 가상점을 잇는 방향으로 양쪽 화면 경계까지 연장
                 var edge1 = extendCamToEdge(tempPair.pt1.x, tempPair.pt1.y, dx, dy, width, height);
                 var edge2 = extendCamToEdge(tempPair.pt2.x, tempPair.pt2.y, -dx, -dy, width, height);
-
                 lineDrawCam(edge1.x, edge1.y, edge2.x, edge2.y, segment.color);
             }
+        }
+    });
+
+    // 2. ★ 카메라 화면 배관 라벨 표출 (중복 방지를 위한 PPGidx 그룹화)
+    var drawnLabelIds = {};
+
+    camPoints.forEach(function(segment) {
+        if (drawnLabelIds[segment.PPGidx]) return;
+
+        // 배관 선분의 중앙 지점 좌표 계산
+        var midPos = getPointAtRatio(segment.pos1, segment.pos2, 0.5);
+        var projMid = projectLatLngToScreen(midPos, width, height, centerX, segment.avgDph);
+
+        // 중앙 지점이 화면 투영 영역 내에 노출 중인 경우 라벨 렌더링
+        if (projMid.visible) {
+            var labelText = (segment.diaCode ? segment.diaCode + 'A' : '');
+            if (segment.cntrwkNm) labelText = segment.cntrwkNm + ' (' + labelText + ')';
+
+            drawCamLabel(projMid.x, projMid.y - 12, labelText, segment.srCode);
+            drawnLabelIds[segment.PPGidx] = true;
         }
     });
 }
