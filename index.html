@@ -81,9 +81,37 @@
             margin-top: 1px;
             white-space: nowrap;
         }
+
+        #camIndicator {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+
+            z-index: 9999;
+
+            padding: 8px 10px;
+
+            background: rgba(0, 0, 0, 0.65);
+            color: #00ff00;
+
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.5;
+
+            border-radius: 6px;
+
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+    <div id="camIndicator">
+        <div>ALPHA : <span id="indAlpha">-</span></div>
+        <div>BETA  : <span id="indBeta">-</span></div>
+        <div>GAMMA : <span id="indGamma">-</span></div>
+        <div>ABS   : <span id="indAbsolute">-</span></div>
+        <div>HEAD  : <span id="indHeading">-</span></div>
+    </div>
     <div id ="ui">
         <button id="BtnMyLoc" class="btn" onclick="myPos()">내위치</button>
         <button id="BtnRoadMode" class="btn" onclick="roadMode()">거리뷰</button>

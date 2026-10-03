@@ -351,10 +351,29 @@ function camEvent(event) {
         heading = smoothHeading;
     }
 
+    /*console.log(
+        "A:", event.alpha?.toFixed(1),
+        "B:", event.beta?.toFixed(1),
+        "G:", event.gamma?.toFixed(1),
+        "H:", heading?.toFixed(1)
+    );*/
+
     // 2. 스마트폰 상하 기울기 (Pitch) 구하기 (도 단위)
     if (event.beta !== null) {
         devicePitch = event.beta; // 핸드폰을 수직으로 세우면 ~90도
     }
+
+    // 센서값 표시
+    document.getElementById("indAlpha").textContent =
+        event.alpha != null ? event.alpha.toFixed(2) : "-";
+    document.getElementById("indBeta").textContent =
+        event.beta != null ? event.beta.toFixed(2) : "-";
+    document.getElementById("indGamma").textContent =
+        event.gamma != null ? event.gamma.toFixed(2) : "-";
+    document.getElementById("indAbsolute").textContent =
+        event.absolute;
+    document.getElementById("indHeading").textContent =
+        heading.toFixed(2);
 
     // 화면 갱신
     if (!camUpdateTimer) {
