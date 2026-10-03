@@ -3,23 +3,23 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KDHC 현장도우미</title>
+    <title>한난맵 고</title>
     <style>
         body {
             margin: 0;
-        }
-        #box1 {
             width: 100%; height: 100vh;
             position: relative;
+            background-color: black;
         }
         #ui {
             position: absolute;
-            top: 10px; right: 10px;
+            top: 10px; left: 10px;
             z-index: 100;
             display: flex;
-            flex-direction: column;
             gap: 1px;
         }
+        .selected_btn {color:#fff;background:#425470;}
+
         #map {
             position: absolute;
             top: 0; left: 0;
@@ -39,13 +39,6 @@
             width: 100%; height: 100%;
             z-index: 3;
         }
-        #roadSVG {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 4;
-            pointer-events: none; /* 클릭 이벤트 투과 */
-        }
         #camBox {
             position: absolute;
             top: 0; left: 0;
@@ -57,257 +50,225 @@
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
+            object-fit: cover; /* 카메라 비율 맞춤 */
             z-index: 3;
         }
         #camSVG {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            z-index: 4;
+            z-index: 4; /* 비디오 위에 SVG 배치 */
             pointer-events: none; /* 클릭 이벤트 투과 */
         }
-        /* 맵의 배관 관경 라벨 스타일 */
-        .mapPPG-s-label {
-            font-size: 10px; font-weight: bold;
-            color: #ff0000;
-            white-space: nowrap;
+        
+
+        /* 맨홀 오버레이 */
+        .mh-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: auto; /* 클릭 이벤트를 받으려면 auto, 지도 클릭을 방해하지 않으려면 none */
         }
-        .mapPPG-r-label {
-            font-size: 10px; font-weight: bold;
-            color: #ffa000;
-            white-space: nowrap;
+        .mh-icon {/* 맨홀 아이콘 이미지 */
+            width: 24px; height: 24px;
         }
-        /* 로드뷰 배관 라벨 스타일 */
-        .road-pipe-label {
-            padding: 3px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
+        .mh-label {/* 맨홀 이름 라벨 */
+            background: rgba(0, 0, 0, 0.7);
             color: #ffffff;
-            background-color: rgba(0, 0, 0, 0.7);
+            font-size: 9px;
+            padding: 1px 3px;
+            border-radius: 3px;
+            margin-top: 1px;
             white-space: nowrap;
-            border: 1px solid #ffffff;
-        }
-        .road-label-s {
-            border-color: #ff0000;
-            color: #ff9999;
-        }
-        .road-label-r {
-            border-color: #ffa000;
-            color: #ffeb3b;
-        }
-        .road-label-default {
-            border-color: #cccccc;
-            color: #ffffff;
-        }
-        #camStatusOverlay {
-            display: none; /* 기본 상태는 숨김 */
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-            padding: 6px 12px;
-            background: rgba(0, 0, 0, 0.65);
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: bold;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            pointer-events: none; /* 터치/클릭 이벤트가 뒤쪽 화면으로 전달되도록 설정 */
-        }
-        /* index_3.html <style> 태그 내부 추가 */
-        .cam-pipe-label {
-            font-size: 11px;
-            font-weight: bold;
-            fill: #ffffff;
-            text-anchor: middle;
-            dominant-baseline: middle;
-            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));
-        }
-        .cam-label-s {
-            fill: #ff9999;
-        }
-        .cam-label-r {
-            fill: #ffeb3b;
         }
     </style>
 </head>
 <body>
-    <div id="box1">
-        <div id ="ui">
-            <input type="file" id="csvFile" accept=".csv">
-            <button id="normalBtn" class="btn" onclick="setMapType('normal')">일반</button>
-            <button id="satelliteBtn" class="btn" onclick="setMapType('satellite')">위성</button>
-            <button id="myLocationBtn" class="btn" onclick="moveToMyLocation()">내위치</button>
-            <button id="roadModeBtn" class="btn" onclick="roadMode()">거리뷰</button>
-            <button id="closeRoadBtn" class="btn" onclick="closeRoadView()" style="display: none;">로드뷰 닫기</button>
-            <button id="openCamBtn" onclick="openCamView()">카메라 열기</button>
-            <button id="closeCamBtn" onclick="closeCamView()" style="display: none;">카메라 닫기</button>
-        </div>
-        <div id="map"></div>
-        <div id="roadBox">
-            <div id="roadView"></div>
-            <svg id="roadSVG"></svg>
-        </div>
-        <div id="camBox">
-            <div id="camStatusOverlay">방향: 0° | 각도: 0°</div>
-            <video id="camView" autoplay playsinline muted></video>
-            <svg id="camSVG"></svg>
-        </div>
+    <div id ="ui">
+        <button id="BtnMyLoc" class="btn" onclick="myPos()">내위치</button>
+        <button id="BtnRoadMode" class="btn" onclick="roadMode()">거리뷰</button>
+        <button id="BtnOpenCam"class="btn" onclick="openCam()">카메라</button>
+        <button id="BtnCloseRoad" class="btn" onclick="closeRoad()" style="display: none;">로드뷰 닫기</button>
+        <button id="BtnCloseCam" class="btn" onclick="closeCam()" style="display: none;">카메라 닫기</button>
+        <input type="file" id="csvFile" accept=".csv">
     </div>
-    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
-    <script src="mmm.js"></script>
-    <script src="road.js"></script>
-    <script src="cam.js"></script>
-    <script>
-        var cMode = "map";
-
-        var map;
-        var myLocationMarker = null;
-
-        var roadView;
-        var roadSVG;
-        var roadClient;
-        var roadOn_flag = false;
-
-        var camView;
-        var camSVG;
-
-        // ★ 데이터 불러오기 중요 로컬에서 임시로 사용
-        const fileInput = document.getElementById('csvFile');
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const csvText = event.target.result;
-                parsePPG(csvText);
-            };
-            reader.readAsText(file, 'utf-8');
-        });
-
-        kakao.maps.load(function() {// 처음 시작시
-            // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
-            var savedLat = localStorage.getItem('last_lat');
-            var savedLng = localStorage.getItem('last_lng');
-            var savedLevel = localStorage.getItem('last_level');
-
-            var initialCenter = (savedLat && savedLng) 
-                ? new kakao.maps.LatLng(parseFloat(savedLat), parseFloat(savedLng))
-                : new kakao.maps.LatLng(37.3797697, 127.1159946);// 기본값
-            var initialLevel = savedLevel ? parseInt(savedLevel, 10) : 3;
-
-            var initial = {center: initialCenter, level: initialLevel};
-
-            //map
-            map = new kakao.maps.Map(document.getElementById('map'), initial);
-            // 무반응 map.setMinLevel(0);// 지도의 최소 레벨을 0으로 설정하여 더 크게 확대 가능하도록 변경
-            // 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
-            kakao.maps.event.addListener(map, 'idle', function() {
-                if (!map) return;
-                var center = map.getCenter();
-                var level = map.getLevel();
-
-                localStorage.setItem('last_lat', center.getLat());
-                localStorage.setItem('last_lng', center.getLng());
-                localStorage.setItem('last_level', level);
-
-                map_PPG();
-                //MH_map();
-            });
-
-            // 지도 클릭 이벤트 거리뷰 열기
-            kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-                if (roadOn_flag) openRoadView(mouseEvent.latLng);
-            });
-
-            //road
-            roadView = new kakao.maps.Roadview(document.getElementById('roadView'));
-            roadSVG = document.getElementById('roadSVG');
-            roadClient = new kakao.maps.RoadviewClient();
-
-            //로드뷰 이벤트
-            kakao.maps.event.addListener(roadView, 'viewpoint_changed', roadEvent);
-            kakao.maps.event.addListener(roadView, 'position_changed', roadEvent);
-            kakao.maps.event.addListener(roadView, 'panoid_changed', roadEvent);
-
-            //cam
-            camView = document.getElementById("camView");
-            camSVG = document.getElementById('camSVG');
-
-            // ★ 데이터 불러오기 중요 서버환경에서만 가능
-            loadPPG('bundang/PPG.csv');
-            //loadMH('bundang/MH.csv');
-        });
-
-        // 일반/위성 모드 전환
-        function setMapType(maptype) {
-            if (maptype === 'normal') map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-            else if (maptype === 'satellite') map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
-        }
-        // 거리뷰 모드 켜고 끄기
-        function roadMode() {
-            if (roadOn_flag == true){ 
-                roadOn_flag = false;
-                map.setCursor('grab');
-                map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-            } else { 
-                roadOn_flag = true;
-                map.setCursor('crosshair');
-                map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-            }
-        }
-        // 스마트폰인지 확인
-        function isMobileDevice() {
-            return /Android|Phone|iPad|iPod/i.test(navigator.userAgent);
-        }
-        function moveToMyLocation() {
-            if (!navigator.geolocation) {
-                alert("이 기기에서는 위치 정보를 사용할 수 없습니다.");
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    var lat = position.coords.latitude;
-                    var lng = position.coords.longitude;
-
-                    var myPosition = new kakao.maps.LatLng(lat, lng);
-                    map.panTo(myPosition);// 지도 이동
-
-                    // 기존 내 위치 마커 제거
-                    if (myLocationMarker) myLocationMarker.setMap(null);
-
-                    // 내 위치 마커 생성
-                    myLocationMarker = new kakao.maps.Marker({
-                        position: myPosition
-                    });
-
-                    myLocationMarker.setMap(map);
-                },
-                function(error) {
-                    console.error("위치 가져오기 실패:", error);
-                    if (error.code === 1) alert("위치 권한이 허용되지 않았습니다.");
-                    else if (error.code === 2) alert("현재 위치를 확인할 수 없습니다.");
-                    else if (error.code === 3) alert("위치 확인 시간이 초과되었습니다.");
-                },
-                {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
-            );
-        }
-
-        function allNone(){
-            document.getElementById('map').style.display = 'none';
-            document.getElementById('roadBox').style.display = 'none';
-            document.getElementById("camBox").style.display = 'none';
-
-            document.getElementById('normalBtn').style.display = 'none';
-            document.getElementById('satelliteBtn').style.display = 'none';
-            document.getElementById('myLocationBtn').style.display = 'none';
-            document.getElementById('roadModeBtn').style.display = 'none';
-            document.getElementById('closeRoadBtn').style.display = 'none';
-            document.getElementById('openCamBtn').style.display = 'none';
-            document.getElementById('closeCamBtn').style.display = 'none';
-        }
-    </script>
+    <div id="map"></div>
+    <div id="roadBox">
+        <div id="roadView"></div>
+        <svg id="roadSVG"></svg>
+    </div>
+    <div id="camBox">
+        <video id="camView" autoplay playsinline muted></video>
+        <svg id="camSVG"></svg>
+    </div>
 </body>
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
+<script type="text/javascript" src="test.js"></script>
+<script type="text/javascript">
+    var cMode = "map";
+
+    var map;
+    var myPosMarker = null;
+    var roadMode_On = false;
+
+    var roadView;
+    var roadSVG;
+    var roadClient;
+
+    var camView;
+    var camSVG;
+
+    // ★ 데이터 불러오기 중요 로컬에서 임시로 사용
+    const fileInput = document.getElementById('csvFile');
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const csvText = event.target.result;
+            parseMH(csvText);
+            mapMH();
+        };
+        reader.readAsText(file, 'utf-8');
+    });
+    
+    kakao.maps.load(function() {
+        // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
+        var savedLat = localStorage.getItem('last_lat');
+        var savedLng = localStorage.getItem('last_lng');
+        var savedLevel = localStorage.getItem('last_level');
+
+        var initialCenter = (savedLat && savedLng) 
+            ? new kakao.maps.LatLng(parseFloat(savedLat), parseFloat(savedLng))
+            : new kakao.maps.LatLng(37.3797697, 127.1159946);// 기본값
+        var initialLevel = savedLevel ? parseInt(savedLevel, 10) : 3;
+
+        var initial = {center: initialCenter, level: initialLevel};
+
+        //map
+        map = new kakao.maps.Map(document.getElementById('map'), initial);
+        // 일반 지도와 스카이뷰로 지도 타입을 전환할 수 있는 지도타입 컨트롤을 생성합니다
+        // 지도 확대 축소를 제어할 수 있는  줌 컨트롤을 생성합니다
+        var mapTypeControl = new kakao.maps.MapTypeControl();
+        var zoomControl = new kakao.maps.ZoomControl();
+
+        // 지도에 컨트롤을 추가해야 지도위에 표시됩니다
+        // kakao.maps.ControlPosition은 컨트롤이 표시될 위치를 정의하는데 TOPRIGHT는 오른쪽 위를 의미합니다
+        map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+        map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+        // 무반응 map.setMinLevel(0);// 지도의 최소 레벨을 0으로 설정하여 더 크게 확대 가능하도록 변경
+        // 지도가 움직이거나 확대/축소될 때 현재 위치를 localStorage에 저장 & 배관 갱신
+        kakao.maps.event.addListener(map, 'idle', function() {
+            if (!map) return;
+            var center = map.getCenter();
+            var level = map.getLevel();
+
+            localStorage.setItem('last_lat', center.getLat());
+            localStorage.setItem('last_lng', center.getLng());
+            localStorage.setItem('last_level', level);
+
+            mapMH();
+        });
+
+        // 지도 클릭 이벤트 거리뷰 열기
+        kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+            if (roadMode_On) openRoad(mouseEvent.latLng);
+        });
+
+        //road
+        roadView = new kakao.maps.Roadview(document.getElementById('roadView'));
+        roadSVG = document.getElementById('roadSVG');
+        roadClient = new kakao.maps.RoadviewClient();
+
+        //로드뷰 이벤트
+        kakao.maps.event.addListener(roadView, 'viewpoint_changed', roadEvent);
+        kakao.maps.event.addListener(roadView, 'position_changed', roadEvent);
+        kakao.maps.event.addListener(roadView, 'panoid_changed', roadEvent);
+
+        //cam
+        camView = document.getElementById("camView");
+        camSVG = document.getElementById('camSVG');
+
+        // ★ 데이터 불러오기 중요 서버환경에서만 가능
+        //loadMH('bundang/MH.csv');
+    });
+
+    function myPos() {
+        if (!navigator.geolocation) {
+            alert("이 기기에서는 위치 정보를 사용할 수 없습니다.");
+            return;
+        }
+        console.log("현재 위치 확인 중...");
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                // kakao.maps.LatLng 객체로 변환하여 넘겨주어야 합니다.
+                var myPos = new kakao.maps.LatLng(
+                    position.coords.latitude,
+                    position.coords.longitude
+                );
+                map.panTo(myPos);// 지도 이동
+
+                // 기존 내 위치 마커 제거
+                if (myPosMarker) myPosMarker.setMap(null);
+                // 내 위치 마커 생성
+                myPosMarker = new kakao.maps.Marker({position: myPos});
+                myPosMarker.setMap(map);
+            },
+            function(error) {
+                console.error("GPS 오류:",error);
+                if (error.code === 1) alert("위치 권한이 허용되지 않았습니다.");
+                else if (error.code === 2) alert("현재 위치를 확인할 수 없습니다.");
+                else if (error.code === 3) alert("위치 확인 시간이 초과되었습니다.");
+            },
+            {enableHighAccuracy: true,  timeout: 15000, maximumAge: 3000}
+        );
+    }
+
+    // 거리뷰 모드 켜고 끄기
+    function roadMode() {
+        var BtnRoadMode = document.getElementById('BtnRoadMode');
+        if (roadMode_On == true){ 
+            roadMode_On = false;
+            map.setCursor('grab');
+            map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+            BtnRoadMode.className = 'btn';
+        } else { 
+            roadMode_On = true;
+            map.setCursor('crosshair');
+            map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+            BtnRoadMode.className = 'selected_btn';
+        }
+    }
+
+    function allNone(){
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('roadBox').style.display = 'none';
+        document.getElementById("camBox").style.display = 'none';
+
+        document.getElementById('BtnMyLoc').style.display = 'none';
+        document.getElementById('BtnRoadMode').style.display = 'none';
+        document.getElementById('BtnOpenCam').style.display = 'none';
+        document.getElementById('BtnCloseRoad').style.display = 'none';
+        document.getElementById('BtnCloseCam').style.display = 'none';
+    }
+
+    // 두 위경도 좌표 간의 방위각(0~360도)을 구하는 함수
+    function getBearing(lat1, lng1, lat2, lng2) {
+        var RAD = Math.PI / 180;
+        var y = Math.sin((lng2 - lng1) * RAD) * Math.cos(lat2 * RAD);
+        var x = Math.cos(lat1 * RAD) * Math.sin(lat2 * RAD) -
+                Math.sin(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos((lng2 - lng1) * RAD);
+        var brng = Math.atan2(y, x) * (180 / Math.PI);
+        return (brng + 360) % 360;
+    }
+    // 각도 정규화
+    function normalizeAngle(angle) {
+        angle = angle % 360;
+        if (angle < 0) angle += 360;
+        return angle;
+    }
+</script>
+</html>
