@@ -192,11 +192,41 @@ async function openCam() {
 
     if (camSVG) camSVG.replaceChildren();// SVG 초기화
 
+    // 시험용 인디케이터 행 추가 (index.html 수정 없이)
+    if (!document.getElementById("indMe")) {
+        document.getElementById("camIndicator").insertAdjacentHTML("beforeend",
+            '<div>ME : <span id="indMe">-</span></div>' +
+            '<div>TEST : <span id="indTest">-</span></div>' +
+            '<div>DIST : <span id="indDist">-</span></div>' +
+            '<div>XY : <span id="indXY">-</span></div>');
+    }
+
     // 이전 상태 초기화
     cmaPos = null;
     heading = null;
     camRot = null;
     testMH = null;
+
+    // 방향 센서 시작 (카메라 await 전에. iOS 권한 요청은 버튼 클릭 직후여야 함. await 뒤면 사용자 제스처 소멸로 거부될 수 있음)
+    // iPhone / iPad
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+    typeof DeviceOrientationEvent.requestPermission === "function") {
+        DeviceOrientationEvent.requestPermission()
+        .then(function(permission) {
+            if (permission === "granted") {
+                window.addEventListener("deviceorientation",camEvent,true);
+                console.log("iOS 방향 센서 시작");
+            }
+            else alert("방향 센서 권한 거부: " + permission);
+        })
+        .catch(function(error) {
+            alert("방향 센서 권한 오류: " + error.message);
+        });
+    }
+    // Android
+    window.addEventListener("deviceorientationabsolute",camEvent,true);
+    window.addEventListener("deviceorientation",camEvent,true);
+    console.log("Android 방향 센서 시작");
 
     //stopCameraLocation();// 혹시 남아 있는 GPS watcher 제거
     if (camGeoWatchId !== null) {
@@ -232,7 +262,8 @@ async function openCam() {
         function(position) {
             cmaPos = {
                 lat:position.coords.latitude,
-                lng:position.coords.longitude
+                lng:position.coords.longitude,
+                acc:position.coords.accuracy
             };
             console.log("현재 위치:",cmaPos.lat,cmaPos.lng);
             drawCam();// 화면 표시
@@ -251,7 +282,8 @@ async function openCam() {
         function(position) {
             cmaPos = {
                 lat:position.coords.latitude,
-                lng:position.coords.longitude
+                lng:position.coords.longitude,
+                acc:position.coords.accuracy
             };
 
             if (camUpdateTimer) return;
@@ -267,27 +299,6 @@ async function openCam() {
     );
 
     console.log("GPS watch 시작:",camGeoWatchId);
-
-    // 방향 센서 시작
-    // iPhone / iPad
-    if (typeof DeviceOrientationEvent !== "undefined" &&
-    typeof DeviceOrientationEvent.requestPermission === "function") {
-        DeviceOrientationEvent.requestPermission()
-        .then(function(permission) {
-            if (permission === "granted") {
-                window.addEventListener("deviceorientation",camEvent,true);
-                console.log("iOS 방향 센서 시작");
-            }
-            else console.log("방향 센서 권한 거부");
-        })
-        .catch(function(error) {
-            console.error("방향 센서 권한 오류:",error);
-        });
-    }
-    // Android
-    window.addEventListener("deviceorientationabsolute",camEvent,true);
-    window.addEventListener("deviceorientation",camEvent,true);
-    console.log("Android 방향 센서 시작");
 }
 
 function closeCam() {
@@ -329,6 +340,13 @@ function closeCam() {
 function camEvent(event) {
     if (cMode !== "cam") return;
 
+    // 센서값 표시 (시험용: 절대방위 없는 이벤트도 표시해서 어떤 이벤트가 오는지 확인)
+    document.getElementById("indAlpha").textContent = event.alpha != null ? event.alpha.toFixed(2) : "-";
+    document.getElementById("indBeta").textContent = event.beta != null ? event.beta.toFixed(2) : "-";
+    document.getElementById("indGamma").textContent = event.gamma != null ? event.gamma.toFixed(2) : "-";
+    document.getElementById("indAbsolute").textContent = event.absolute +
+        (event.webkitCompassHeading != null ? " / compass " + event.webkitCompassHeading.toFixed(1) : "");
+
     // 절대 방위 없는 이벤트(안드로이드 상대 orientation 등)는 버림
     var compass = event.webkitCompassHeading;// iOS: 카메라가 보는 자북 방위
     if (compass == null && event.absolute !== true) return;
@@ -345,12 +363,6 @@ function camEvent(event) {
     if (!camRot) camRot = R;
     else for (var i = 0; i < 9; i++) camRot[i] += (R[i] - camRot[i]) * 0.10;
     heading = headingOf(camRot);
-
-    // 센서값 표시
-    document.getElementById("indAlpha").textContent = event.alpha.toFixed(2);
-    document.getElementById("indBeta").textContent = event.beta.toFixed(2);
-    document.getElementById("indGamma").textContent = event.gamma.toFixed(2);
-    document.getElementById("indAbsolute").textContent = event.absolute;
     document.getElementById("indHeading").textContent = heading.toFixed(2);
 
     // 화면 갱신
@@ -364,10 +376,18 @@ function camEvent(event) {
 
 // 카메라 화면에 맨홀 오버레이 그리기
 function drawCam() {
-    if (cMode !== "cam" || !cmaPos || !camRot) return;
+    if (cMode !== "cam" || !cmaPos) return;
 
     // 시험용: 첫 위치 기준 북쪽 20m에 임시 지점 고정. 걸어가면 거리 줄어야 함. 카메라 다시 열면 재설정
     if (!testMH) testMH = {name: "TEST", position: new kakao.maps.LatLng(cmaPos.lat + 20 / 111320, cmaPos.lng)};
+    document.getElementById("indMe").textContent =
+        cmaPos.lat.toFixed(6) + ", " + cmaPos.lng.toFixed(6) + " (±" + Math.round(cmaPos.acc) + "m)";
+    document.getElementById("indTest").textContent =
+        testMH.position.getLat().toFixed(6) + ", " + testMH.position.getLng().toFixed(6);
+    if (!camRot) {
+        document.getElementById("indXY").textContent = "센서 없음 (absolute 방위 이벤트 안 옴)";
+        return;
+    }
 
     var container = document.getElementById("camBox");
     var width = container.clientWidth;
@@ -393,10 +413,22 @@ function drawCam() {
         var east = (mh.position.getLng() - cmaPos.lng) * 111320 * cosLat;
         var north = (mh.position.getLat() - cmaPos.lat) * 111320;
         var dist = Math.hypot(east, north);
-        if (dist > camDistance) return;
+        var p = dist <= camDistance ? camProject(camRot, east, north, -CAMERA_HEIGHT, width, height, f, screenAngle) : null;
 
-        var p = camProject(camRot, east, north, -CAMERA_HEIGHT, width, height, f, screenAngle);
+        if (mh === testMH) {// 시험용: TEST 지점 상태 표시
+            var brg = (Math.atan2(east, north) * DEG + 360) % 360;
+            var diff = ((brg - heading + 540) % 360) - 180;// 카메라 방위 기준 좌(-)/우(+) 각도
+            document.getElementById("indDist").textContent = Math.round(dist) + "m 방위 " + brg.toFixed(0) +
+                "° 차이 " + diff.toFixed(0) + "° (보이는 범위 ±" + (Math.atan(width / 2 / f) * DEG).toFixed(0) + "°)";
+            document.getElementById("indXY").textContent = p ? Math.round(p.x) + ", " + Math.round(p.y) :
+                (dist > camDistance ? "표시 범위 밖" : "카메라 뒤쪽/화면 밖");
+        }
         if (!p) return;// 카메라 뒤쪽 또는 화면 밖
+
+        // 시험용: foreignObject와 별개로 순수 SVG 점. 점만 보이면 foreignObject 문제
+        var dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", 6); dot.setAttribute("fill", "red");
+        camSVG.appendChild(dot);
 
         var content = `
             <div class="mh-overlay" style="cursor:pointer;">
