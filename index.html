@@ -7,9 +7,10 @@
     <style>
         body {
             margin: 0;
+        }
+        #box1 {
             width: 100%; height: 100vh;
             position: relative;
-            background-color: black;
         }
         #ui {
             position: absolute;
@@ -136,29 +137,31 @@
     </style>
 </head>
 <body>
-    <div id="camIndicator">
-        <div>ALPHA : <span id="indAlpha">-</span></div>
-        <div>BETA  : <span id="indBeta">-</span></div>
-        <div>GAMMA : <span id="indGamma">-</span></div>
-        <div>ABS   : <span id="indAbsolute">-</span></div>
-        <div>HEAD  : <span id="indHeading">-</span></div>
-    </div>
-    <div id ="ui">
-        <button id="BtnMyLoc" class="btn" onclick="myPos()">내위치</button>
-        <button id="BtnRoadMode" class="btn" onclick="roadMode()">거리뷰</button>
-        <button id="BtnOpenCam"class="btn" onclick="openCam()">카메라</button>
-        <button id="BtnCloseRoad" class="btn" onclick="closeRoad()" style="display: none;">로드뷰 닫기</button>
-        <button id="BtnCloseCam" class="btn" onclick="closeCam()" style="display: none;">카메라 닫기</button>
-        <input type="file" id="csvFile" accept=".csv">
-    </div>
-    <div id="map"></div>
-    <div id="roadBox">
-        <div id="roadView"></div>
-        <svg id="roadSVG"></svg>
-    </div>
-    <div id="camBox">
-        <video id="camView" autoplay playsinline muted></video>
-        <svg id="camSVG"></svg>
+    <div id="box1">
+        <div id="camIndicator">
+            <div>ALPHA : <span id="indAlpha">-</span></div>
+            <div>BETA  : <span id="indBeta">-</span></div>
+            <div>GAMMA : <span id="indGamma">-</span></div>
+            <div>ABS   : <span id="indAbsolute">-</span></div>
+            <div>HEAD  : <span id="indHeading">-</span></div>
+        </div>
+        <div id ="ui">
+            <button id="BtnMyLoc" class="btn" onclick="myPos()">내위치</button>
+            <button id="BtnRoadMode" class="btn" onclick="roadMode()">거리뷰</button>
+            <button id="BtnOpenCam"class="btn" onclick="openCam()">카메라</button>
+            <button id="BtnCloseRoad" class="btn" onclick="closeRoad()" style="display: none;">로드뷰 닫기</button>
+            <button id="BtnCloseCam" class="btn" onclick="closeCam()" style="display: none;">카메라 닫기</button>
+            <input type="file" id="csvFile" accept=".csv">
+        </div>
+        <div id="map"></div>
+        <div id="roadBox">
+            <div id="roadView"></div>
+            <svg id="roadSVG"></svg>
+        </div>
+        <div id="camBox">
+            <video id="camView" autoplay playsinline muted></video>
+            <svg id="camSVG"></svg>
+        </div>
     </div>
 </body>
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false"></script>
