@@ -15,6 +15,8 @@ function mapUpdate() {
     mapBounds = map.getBounds();
     mapPPG();
     mapMH();
+    mapMCR();
+    mapHDH();
 }
 
 function openRoad(position) {
@@ -39,6 +41,7 @@ function closeRoad() {
     cMode = "map";
     allNone();
     document.getElementById('map').style.display = 'block';
+    document.getElementById('BtnSearch').style.display = 'block'; // 추가
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
     document.getElementById('BtnOpenCam').style.display = 'block';
@@ -72,6 +75,8 @@ function roadUpdate() {
 
     roadPPG();
     roadMH();
+    roadMCR();
+    roadHDH();
 }
 
 var camUpdateTimer = null;
@@ -97,11 +102,11 @@ var REDRAW_DIST = 1;// 내 위치가 이만큼(m) 이상 움직여야 다시 그
 var CAMERA_FOV = 69;// 카메라 화각(°, 영상 긴 변 기준). 보통 65~75. 마커 간격이 실제보다 좁거나 넓으면 조정
 var CAMERA_HEIGHT = 1.5;// 카메라 높이(m). 맨홀은 지면이라 이만큼 아래에 그림
 var MAG_DECLINATION = -8.7;// 자기 편각(°). 분당 2026년 약 -8.7(서편각)
-var camDistance = 100;// 표시 범위(m)
+var camDistance = 30;// 표시 범위(m)
 
 //그리기 공통
-var width = 0;
-var height = 0;
+var camWt = 0;
+var camHt = 0;
 var cosLat = 0;
 var f;
 var screenAngle = 0;
@@ -230,6 +235,7 @@ function closeCam() {
     cMode = "map";
     allNone();
     document.getElementById('map').style.display = 'block';
+    document.getElementById('BtnSearch').style.display = 'block'; // 추가
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
     document.getElementById('BtnOpenCam').style.display = 'block';
@@ -332,31 +338,33 @@ function drawCam() {
     if (cMode !== "cam" || !cmaPos || !camRot) return;
 
     var container = document.getElementById("camBox");
-    width = container.clientWidth;
-    height = container.clientHeight;
+    camWt = container.clientWidth;
+    camHt = container.clientHeight;
 
     // 1. SVG 컨테이너 초기화
     if (!camSVG) camSVG = document.getElementById('camSVG');
-    camSVG.setAttribute("width", width);
-    camSVG.setAttribute("height", height);
+    camSVG.setAttribute("width", camWt);
+    camSVG.setAttribute("height", camHt);
     // 시험용: 중앙 십자선
-    camSVG.innerHTML = '<line x1="' + width / 2 + '" y1="0" x2="' + width / 2 + '" y2="' + height + '" stroke="#0f0" opacity="0.6"/>' +
-        '<line x1="0" y1="' + height / 2 + '" x2="' + width + '" y2="' + height / 2 + '" stroke="#0f0" opacity="0.6"/>';
+    camSVG.innerHTML = '<line x1="' + camWt / 2 + '" y1="0" x2="' + camWt / 2 + '" y2="' + camHt + '" stroke="#0f0" opacity="0.6"/>' +
+        '<line x1="0" y1="' + camHt / 2 + '" x2="' + camWt + '" y2="' + camHt / 2 + '" stroke="#0f0" opacity="0.6"/>';
 
     // 2. 초점거리(px): 영상 긴 변 화각 기준, object-fit:cover 확대율 반영
-    var vw = camView.videoWidth || width, vh = camView.videoHeight || height;
-    f = Math.max(width / vw, height / vh) * Math.max(vw, vh) / 2 / Math.tan(CAMERA_FOV / 2 * RAD);
+    var vw = camView.videoWidth || camWt, vh = camView.videoHeight || camHt;
+    f = Math.max(camWt / vw, camHt / vh) * Math.max(vw, vh) / 2 / Math.tan(CAMERA_FOV / 2 * RAD);
     screenAngle = (screen.orientation ? screen.orientation.angle : window.orientation) || 0;// 가로모드 회전
     cosLat = Math.cos(cmaPos.lat * RAD);
     drawn = [];
-    lastDraw = {width: width, height: height, f: f, screenAngle: screenAngle};
+    lastDraw = {camWt: camWt, camHt: camHt, f: f, screenAngle: screenAngle};
     drawnRot = camRot.slice();
     drawnPos = {lat: cmaPos.lat, lng: cmaPos.lng};
     document.getElementById("indView").textContent =
-        "보이는 범위 ±" + (Math.atan(width / 2 / f) * DEG).toFixed(0) + "°, 화면회전 " + screenAngle;
+        "보이는 범위 ±" + (Math.atan(camWt / 2 / f) * DEG).toFixed(0) + "°, 화면회전 " + screenAngle;
 
-    camMH();
     camPPG();
+    camMH();
+    camMCR();
+    camHDH();
 }
 
 
@@ -373,7 +381,7 @@ function camTap(ev) {
     });
 
     // 탭 지점 광선의 방위(현재 추정 기준) vs 그 마커의 실제 방위 → 차이만큼 보정
-    var tapHead = rayHeading(camRot, tx, ty, d.width, d.height, d.f, d.screenAngle);
+    var tapHead = rayHeading(camRot, tx, ty, d.camWt, d.camHt, d.f, d.screenAngle);
     var cosLat = Math.cos(cmaPos.lat * RAD);
     var east = (best.mh.position.getLng() - cmaPos.lng) * 111320 * cosLat;
     var north = (best.mh.position.getLat() - cmaPos.lat) * 111320;

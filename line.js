@@ -217,8 +217,13 @@ function mapPPG(){
 
 function roadPPG(){
     // 배관 관련 그래픽 요소를 화면에서 제거
+    //for (var idx = 0; idx < roadPPG_label.length; idx++) {
+    //    roadPPG_label[idx].setMap(null);
+    //}
     for (var idx = 0; idx < roadPPG_label.length; idx++) {
-        roadPPG_label[idx].setMap(null);
+        if (roadPPG_label[idx] && roadPPG_label[idx].parentNode) {
+            roadPPG_label[idx].remove(); // DOM 요소 삭제
+        }
     }
     for (var i = 0; i < roadPPG_over.length; i++) {
         roadPPG_over[i].setMap(null);
@@ -296,15 +301,15 @@ function roadPPG(){
         }
 
         if (pipe.inner1 && pipe.inner2) 
-            lineDraw(pipe.x1, pipe.y1, pipe.x2, pipe.y2, pipe.color);
+            lineDraw(pipe.x1, pipe.y1, pipe.x2, pipe.y2, pipe.color, roadSVG);
         if (pipe.inner1 && !pipe.inner2){
             var tempPoint = findVisibleTempPoint(pipe.pos1, pipe.pos2, pipe.id0)
             if (tempPoint) {// pos1 → 임시점 방향
                 var dx = tempPoint.x - pipe.x1;
                 var dy = tempPoint.y - pipe.y1;
-                var end = extendToScreenEdge(pipe.x1, pipe.y1, dx, dy);
+                var end = extendToRectEdge(pipe.x1, pipe.y1, dx, dy, roadWt, roadHt);
 
-                lineDraw(pipe.x1, pipe.y1, end.x, end.y, pipe.color);
+                lineDraw(pipe.x1, pipe.y1, end.x, end.y, pipe.color, roadSVG);
             }
             
         }
@@ -313,9 +318,9 @@ function roadPPG(){
             if (tempPoint) {// pos1 → 임시점 방향
                 var dx = tempPoint.x - pipe.x2;
                 var dy = tempPoint.y - pipe.y2;
-                var end = extendToScreenEdge(pipe.x2, pipe.y2, dx, dy);
+                var end = extendToRectEdge(pipe.x2, pipe.y2, dx, dy, roadWt, roadHt);
 
-                lineDraw(pipe.x2, pipe.y2, end.x, end.y, pipe.color);
+                lineDraw(pipe.x2, pipe.y2, end.x, end.y, pipe.color, roadSVG);
             }
         }
         if (!pipe.inner1 && !pipe.inner2) {
@@ -323,10 +328,10 @@ function roadPPG(){
             if (tempPoints.point1 && tempPoints.point2) {
                 var dx = tempPoints.point1.x - tempPoints.point2.x;
                 var dy = tempPoints.point1.y - tempPoints.point2.y;
-                var end1 = extendToScreenEdge(tempPoints.point1.x, tempPoints.point1.y, dx, dy);
-                var end2 = extendToScreenEdge(tempPoints.point2.x, tempPoints.point2.y, -dx, -dy);
+                var end1 = extendToRectEdge(tempPoints.point1.x, tempPoints.point1.y, dx, dy, roadWt, roadHt);
+                var end2 = extendToRectEdge(tempPoints.point2.x, tempPoints.point2.y, -dx, -dy, roadWt, roadHt);
 
-                lineDraw(end1.x, end1.y, end2.x, end2.y, pipe.color);
+                lineDraw(end1.x, end1.y, end2.x, end2.y, pipe.color, roadSVG);
             }
         }
     });
@@ -375,7 +380,7 @@ function roadPPG(){
     }
 
     // 각 그룹별 대표 배관 선출 및 라벨 생성
-    groups.forEach(function(group) {
+    /*groups.forEach(function(group) {
         // 길이가 가장 긴 배관을 대표 배관으로 선별
         var ttPPG = group.reduce(function(max, curr) {
             var maxLen = parseFloat(max.plineLt) || 0;
@@ -404,10 +409,67 @@ function roadPPG(){
 
         overlay.setMap(roadView);
         roadPPG_label.push(overlay);
+    });*/
+    // 각 그룹별 대표 배관 선출 및 SVG 라벨 생성
+    groups.forEach(function(group) {
+        // 1. 길이가 가장 긴 배관을 대표 배관으로 선별
+        var ttPPG = group.reduce(function(max, curr) {
+            var maxLen = parseFloat(max.plineLt) || 0;
+            var currLen = parseFloat(curr.plineLt) || 0;
+            return currLen > maxLen ? curr : max;
+        }, group[0]);
+
+        // 2. 중심 좌표 계산
+        var midIdx = Math.floor((ttPPG.coords.length - 1) / 2);
+        var p1 = ttPPG.coords[midIdx];
+        var p2 = ttPPG.coords[midIdx + 1] || p1;
+
+        var centerPos = (ttPPG.srCode === 'S') 
+            ? getPointAtRatio(p1, p2, 0.1) 
+            : getPointAtRatio(p1, p2, 0.9);
+
+        // 3. 임시 DOM 오버레이를 이용하여 centerPos 위치의 SVG 화면 좌표(px) 계산
+        var tempElement = make_roadPPG_over(centerPos, -1, -1, { srCode: 'TEMP' });
+        var rect = tempElement.getBoundingClientRect();
+        
+        var x = rect.left + rect.width / 2 - roadRect.left;
+        var y = rect.top + rect.height / 2 - roadRect.top;
+
+        // 좌표 계산에 쓰인 임시 DOM 엘리먼트 제거
+        tempElement.remove();
+
+        // 계산된 위치가 로드뷰 화면 내부(유효한 영역)인지 확인
+        if (rect.width === 0 || rect.height === 0 || x < 0 || x > roadWt || y < 0 || y > roadHt) {
+            return;
+        }
+
+        // 4. 표시할 배관명 및 구경 텍스트 조합
+        var labelText = ttPPG.eqpId + ' (' + ttPPG.diaCode + 'A)';
+
+        // 5. roadSVG 내부 라벨 클래스 지정
+        var labelClass = (ttPPG.srCode === 'S') ? 'road-s-pipe' : 'road-r-pipe';
+        var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
+        var bgColor = '#000000';
+
+        // 6. SVG <text> 요소 생성
+        var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textNode.setAttribute('x', x.toFixed(1));
+        textNode.setAttribute('y', y.toFixed(1));
+        textNode.setAttribute('fill', labelColor); // ★ 글자색 인라인 지정
+        textNode.setAttribute('stroke', bgColor);
+        textNode.setAttribute('paint-order', 'stroke fill'); // stroke를 글자 뒤로 배치
+        textNode.setAttribute('class', labelClass);
+        textNode.setAttribute('text-anchor', 'middle'); // x축 중앙 정렬
+        textNode.setAttribute('dominant-baseline', 'middle'); // y축 중앙 정렬
+        textNode.textContent = labelText;
+
+        // 7. roadSVG에 추가 및 배열 관리
+        roadSVG.appendChild(textNode);
+        roadPPG_label.push(textNode);
     });
 }
 
-function camPPG() {
+/*function camPPG() {
     if (!cmaPos || !camRot || !camSVG) return;
 
     PPG_all.forEach(function(PPG) {
@@ -441,6 +503,192 @@ function camPPG() {
 
             camSVG.appendChild(circle);
         });
+    });
+}*/
+function camPPG() {
+    if (!cmaPos || !camRot || !camSVG) return;
+    // 매 프레임/갱신마다 기존 그려진 SVG 요소를 초기화
+    camSVG.innerHTML = '';
+
+    PPG_all.forEach(function(PPG) {
+        if (!PPG.coords || PPG.coords.length < 2) return;
+
+        // 배관 색상 설정
+        var color = '#888888';
+        if (PPG.srCode === 'S') color = '#FF0000';
+        else if (PPG.srCode === 'R') color = '#FFA000';
+
+        // 세그먼트 단위로 반복
+        for (var i = 0; i < PPG.coords.length - 1; i++) {
+            var pos1 = PPG.coords[i];
+            var pos2 = PPG.coords[i + 1];
+
+            // 1. pos1 오프셋 & 투영
+            var east1 = (pos1.getLng() - cmaPos.lng) * 111320 * cosLat;
+            var north1 = (pos1.getLat() - cmaPos.lat) * 111320;
+            var dist1 = Math.hypot(east1, north1);
+
+            // 2. pos2 오프셋 & 투영
+            var east2 = (pos2.getLng() - cmaPos.lng) * 111320 * cosLat;
+            var north2 = (pos2.getLat() - cmaPos.lat) * 111320;
+            var dist2 = Math.hypot(east2, north2);
+
+            // 두 점 모두 camDistance보다 멀면 스킵
+            if (dist1 > camDistance && dist2 > camDistance) continue;
+
+            var p1 = camProject(camRot, east1, north1, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+            var p2 = camProject(camRot, east2, north2, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+
+            // 점 생성 (SVG circle)
+            if (!p1) return; // 화면 밖이거나 카메라 뒤쪽에 위치한 경우 무시
+            var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p1.x.toFixed(1));
+            circle.setAttribute("cy", p1.y.toFixed(1));
+            circle.setAttribute("r", "5"); // 점 반지름 (px)
+            circle.setAttribute("fill", color);
+            camSVG.appendChild(circle);
+
+            if (!p2) return; // 화면 밖이거나 카메라 뒤쪽에 위치한 경우 무시
+            var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p2.x.toFixed(1));
+            circle.setAttribute("cy", p2.y.toFixed(1));
+            circle.setAttribute("r", "5"); // 점 반지름 (px)
+            circle.setAttribute("fill", color);
+            camSVG.appendChild(circle);
+
+            // 카메라 화면 내부 여부 확인
+            function isCamScreenInner(x, y) {
+                var margin = 1;
+                return (x >= -margin && x <= camWt + margin && y >= -margin && y <= camHt + margin);
+            }
+
+            var inner1 = p1 && isCamScreenInner(p1.x, p1.y);
+            var inner2 = p2 && isCamScreenInner(p2.x, p2.y);
+
+            // CASE 1: 두 점 모두 화면 내부 -> 그대로 연결
+            if (inner1 && inner2) {
+                lineDraw(p1.x, p1.y, p2.x, p2.y, color, camSVG);
+            }
+            // CASE 2: p1만 내부 -> p2 방향 화면 경계까지 연장
+            else if (inner1 && p2) {
+                var dx = p2.x - p1.x;
+                var dy = p2.y - p1.y;
+                var end = extendToRectEdge(p1.x, p1.y, dx, dy, camWt, camHt);
+                lineDraw(p1.x, p1.y, end.x, end.y, color, camSVG);
+            }
+            // CASE 3: p2만 내부 -> p1 방향 화면 경계까지 연장
+            else if (inner2 && p1) {
+                var dx = p1.x - p2.x;
+                var dy = p1.y - p2.y;
+                var end = extendToRectEdge(p2.x, p2.y, dx, dy, camWt, camHt);
+                lineDraw(p2.x, p2.y, end.x, end.y, color, camSVG);
+            }
+            // CASE 4: 둘 다 외부지만 투영점은 존재하는 경우 화면 교차 검사
+            else if (p1 && p2) {
+                var end1 = extendToRectEdge(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y, camWt, camHt);
+                var end2 = extendToRectEdge(p2.x, p2.y, p1.x - p2.x, p1.y - p2.y, camWt, camHt);
+                if (end1 && end2) {
+                    lineDraw(end1.x, end1.y, end2.x, end2.y, color, camSVG);
+                }
+            }
+        }
+    });
+
+    // 현재 카메라 거리(camDistance) 내에 있는 배관 목록 추출
+    var visiblePPGs = [];
+    var visiblePPGIds = new Set();
+
+    PPG_all.forEach(function(PPG, id0) {
+        if (!PPG.coords || PPG.coords.length < 2) return;
+
+        // 배관의 좌표 중 최소 하나 이상이 카메라 사거리 내에 있는지 확인
+        var isNear = PPG.coords.some(function(pos) {
+            var east = (pos.getLng() - cmaPos.lng) * 111320 * cosLat;
+            var north = (pos.getLat() - cmaPos.lat) * 111320;
+            return Math.hypot(east, north) <= camDistance;
+        });
+
+        if (isNear && !visiblePPGIds.has(id0)) {
+            visiblePPGIds.add(id0);
+            visiblePPGs.push(PPG);
+        }
+    });
+
+    if (visiblePPGs.length === 0) return;
+
+    // 연결성(diaCode, srCode 동일 및 접점 인근) 기반 그룹핑
+    var visited = new Array(visiblePPGs.length).fill(false);
+    var groups = [];
+
+    for (var i = 0; i < visiblePPGs.length; i++) {
+        if (visited[i]) continue;
+
+        var group = [];
+        var queue = [i];
+        visited[i] = true;
+
+        while (queue.length > 0) {
+            var curr = queue.shift();
+            group.push(visiblePPGs[curr]);
+
+            for (var j = 0; j < visiblePPGs.length; j++) {
+                if (visited[j]) continue;
+
+                if (isConnected(visiblePPGs[curr], visiblePPGs[j])) {
+                    visited[j] = true;
+                    queue.push(j);
+                }
+            }
+        }
+        groups.push(group);
+    }
+
+    // 각 그룹별 대표 배관 선출 및 AR SVG 라벨 생성
+    groups.forEach(function(group) {
+        // 대표 배관(가장 긴 배관) 선별
+        var ttPPG = group.reduce(function(max, curr) {
+            var maxLen = parseFloat(max.plineLt) || 0;
+            var currLen = parseFloat(curr.plineLt) || 0;
+            return currLen > maxLen ? curr : max;
+        }, group[0]);
+
+        // 중심 좌표 계산
+        var midIdx = Math.floor((ttPPG.coords.length - 1) / 2);
+        var p1 = ttPPG.coords[midIdx];
+        var p2 = ttPPG.coords[midIdx + 1] || p1;
+
+        var centerPos = (ttPPG.srCode === 'S') 
+            ? getPointAtRatio(p1, p2, 0.1) 
+            : getPointAtRatio(p1, p2, 0.9);
+
+        // 3D 투영을 이용해 카메라 화면 픽셀(px) 좌표로 변환
+        var east = (centerPos.getLng() - cmaPos.lng) * 111320 * cosLat;
+        var north = (centerPos.getLat() - cmaPos.lat) * 111320;
+        
+        var p = camProject(camRot, east, north, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+
+        // 화면 뒤쪽이거나 카메라 화면 영역 바깥이면 표시 안 함
+        if (!p || p.x < 0 || p.x > camWt || p.y < 0 || p.y > camHt) return;
+
+        // 텍스트 조합 및 SVG 라벨 생성
+        var labelText = ttPPG.eqpId + ' (' + ttPPG.diaCode + 'A)';
+        var labelClass = (ttPPG.srCode === 'S') ? 'cam-s-pipe' : 'cam-r-pipe';
+        var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
+        var bgColor = '#000000';
+
+        var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textNode.setAttribute('x', p.x.toFixed(1));
+        textNode.setAttribute('y', p.y.toFixed(1));
+        textNode.setAttribute('fill', labelColor); // ★ 글자색 인라인 지정
+        textNode.setAttribute('stroke', bgColor);
+        textNode.setAttribute('paint-order', 'stroke fill'); // stroke를 글자 뒤로 배치
+        textNode.setAttribute('class', labelClass);
+        textNode.setAttribute('text-anchor', 'middle');
+        textNode.setAttribute('dominant-baseline', 'middle');
+        textNode.textContent = labelText;
+
+        // camSVG에 직접 추가
+        camSVG.appendChild(textNode);
     });
 }
 
@@ -489,7 +737,7 @@ function make_roadPPG_over(pos, PPGidx, pointIdx, PPG) {
     return element
 }
 
-function lineDraw(x1, y1, x2, y2, color){
+function lineDraw(x1, y1, x2, y2, color, svg){
     var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', x1.toFixed(1));
     line.setAttribute('y1', y1.toFixed(1));
@@ -498,7 +746,7 @@ function lineDraw(x1, y1, x2, y2, color){
     line.setAttribute('stroke', color);
     line.setAttribute('stroke-width', '3');
     line.setAttribute('opacity', '0.85');
-    roadSVG.appendChild(line);
+    svg.appendChild(line);
 }
 
 function findVisibleTempPoint(pos1, pos2, PPGidx) {
@@ -584,7 +832,7 @@ function findVisibleTempPoint2(pos1, pos2, PPGidx) {
     };
 }
 
-function extendToScreenEdge(x1, y1, dx, dy) {
+/*function extendToScreenEdge(x1, y1, dx, dy) {
     var candidates = [];
     
     //방향 벡터가 0이면 연장할 수 없다.
@@ -645,5 +893,102 @@ function extendToScreenEdge(x1, y1, dx, dy) {
     candidates.sort(function(a, b) { return b.t - a.t; });
 
     return {x: candidates[0].x, y: candidates[0].y};
+}
+
+// 카메라 화면 경계까지 선 연장 보조 함수
+function extendToCamEdge(x1, y1, dx, dy) {
+    var length = Math.sqrt(dx * dx + dy * dy);
+    if (length < 0.000001) return { x: x1, y: y1 };
+
+    dx /= length;
+    dy /= length;
+
+    var candidates = [];
+
+    if (dx > 0) {
+        var t = (width - x1) / dx;
+        if (t >= 0) {
+            var y = y1 + dy * t;
+            if (y >= 0 && y <= height) candidates.push({ t: t, x: width, y: y });
+        }
+    }
+    if (dx < 0) {
+        var t = (0 - x1) / dx;
+        if (t >= 0) {
+            var y = y1 + dy * t;
+            if (y >= 0 && y <= height) candidates.push({ t: t, x: 0, y: y });
+        }
+    }
+    if (dy > 0) {
+        var t = (height - y1) / dy;
+        if (t >= 0) {
+            var x = x1 + dx * t;
+            if (x >= 0 && x <= width) candidates.push({ t: t, x: x, y: height });
+        }
+    }
+    if (dy < 0) {
+        var t = (0 - y1) / dy;
+        if (t >= 0) {
+            var x = x1 + dx * t;
+            if (x >= 0 && x <= width) candidates.push({ t: t, x: x, y: 0 });
+        }
+    }
+
+    if (candidates.length === 0) return { x: x1, y: y1 };
+
+    candidates.sort(function(a, b) { return b.t - a.t; });
+    return { x: candidates[0].x, y: candidates[0].y };
+}*/
+
+// 1. 공통 연장 함수 정의
+function extendToRectEdge(x1, y1, dx, dy, targetWidth, targetHeight) {
+    var candidates = [];
+
+    // 오른쪽 경계선 검사 (x = targetWidth)
+    if (dx > 0) {
+        var t = (targetWidth - x1) / dx;
+        if (t >= 0) {
+            var y = y1 + dy * t;
+            if (y >= 0 && y <= targetHeight) {
+                candidates.push({ t: t, x: targetWidth, y: y });
+            }
+        }
+    }
+    // 왼쪽 경계선 검사 (x = 0)
+    else if (dx < 0) {
+        var t = (0 - x1) / dx;
+        if (t >= 0) {
+            var y = y1 + dy * t;
+            if (y >= 0 && y <= targetHeight) {
+                candidates.push({ t: t, x: 0, y: y });
+            }
+        }
+    }
+
+    // 아래쪽 경계선 검사 (y = targetHeight)
+    if (dy > 0) {
+        var t = (targetHeight - y1) / dy;
+        if (t >= 0) {
+            var x = x1 + dx * t;
+            if (x >= 0 && x <= targetWidth) {
+                candidates.push({ t: t, x: x, y: targetHeight });
+            }
+        }
+    }
+    // 위쪽 경계선 검사 (y = 0)
+    else if (dy < 0) {
+        var t = (0 - y1) / dy;
+        if (t >= 0) {
+            var x = x1 + dx * t;
+            if (x >= 0 && x <= targetWidth) {
+                candidates.push({ t: t, x: x, y: 0 });
+            }
+        }
+    }
+
+    // t 값이 가장 작은(가장 먼저 만나는) 교점 반환
+    if (candidates.length === 0) return null;
+    candidates.sort(function(a, b) { return a.t - b.t; });
+    return candidates[0];
 }
 
