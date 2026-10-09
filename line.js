@@ -42,13 +42,14 @@ function parsePPG(csvText) {
 
         var eqpId = columns[0] ? columns[0].trim() : '';
         var srCode = columns[1] ? columns[1].trim() : '';
-        var cntrwkNm = columns[2] ? columns[2].replace(/^"|"$/g, '').trim() : '';
-        var diaCode = parseInt(columns[3], 10) || 0;
-        var pipePress = columns[4] ? columns[4].trim() : '';
-        var plineLt = columns[5] ? columns[5].trim() : '';
-        var competDe = columns[6] ? columns[6].trim() : '';
-        var qltyGrade = columns[7] ? columns[7].trim() : '';
-        var avgDph = columns[10] ? columns[10].trim() : '';
+        var LINE_NM = columns[2] ? columns[2].trim() : '';
+        var cntrwkNm = columns[3] ? columns[3].replace(/^"|"$/g, '').trim() : '';
+        var diaCode = parseInt(columns[4], 10) || 0;
+        var pipePress = columns[5] ? columns[5].trim() : '';
+        var plineLt = columns[6] ? columns[6].trim() : '';
+        var competDe = columns[7] ? columns[7].trim() : '';
+        var qltyGrade = columns[8] ? columns[8].trim() : '';
+        var avgDph = columns[11] ? columns[11].trim() : '';
 
         var coordString = line.substring(coordStartIndex + 1, coordEndIndex + 1);
 
@@ -71,6 +72,7 @@ function parsePPG(csvText) {
             PPG_all.push({
                 eqpId: eqpId,
                 srCode: srCode,
+                LINE_NM: LINE_NM,
                 diaCode: diaCode,
                 cntrwkNm: cntrwkNm,
                 pipePress: pipePress,
@@ -444,7 +446,8 @@ function roadPPG(){
         }
 
         // 4. 표시할 배관명 및 구경 텍스트 조합
-        var labelText = ttPPG.eqpId + ' (' + ttPPG.diaCode + 'A)';
+        //var labelText = ttPPG.LINE_NM + ' (' + ttPPG.diaCode + 'A)';
+        var labelText = ttPPG.diaCode + 'A' + ' ('+ ttPPG.LINE_NM +')';
 
         // 5. roadSVG 내부 라벨 클래스 지정
         var labelClass = (ttPPG.srCode === 'S') ? 'road-s-pipe' : 'road-r-pipe';
