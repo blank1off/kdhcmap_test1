@@ -59,7 +59,7 @@
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            object-fit: cover; /* 카메라 비율 맞춤 */
+            /* object-fit: cover; 카메라 비율 맞춤 */
             z-index: 3;
         }
         #camSVG {
@@ -147,6 +147,48 @@
         }
         .search-item:hover { background: #f8f9fa; }
 
+        /* 아이콘 버튼 공통 스타일 */
+        /* 기본 아이콘 버튼 스타일 */
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #425470;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.2s ease;
+        }
+
+        /* 터치/클릭 순간 반응 스타일 */
+        .icon-btn:active {
+            background: #f0f0f0;
+            transform: scale(0.95);
+        }
+
+        /* 로드뷰 모드가 켜졌을 때 활성화 스타일 (배경색 & 글자/아이콘색 반전) */
+        .icon-btn.selected_btn {
+            background: #425470;
+            color: #ffffff;
+            border-color: #31415a;
+        }
+        /* 화면 우측 상단 닫기(X) 전용 버튼 스타일 */
+        .close-btn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 999; /* 화면 최상단 */
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            line-height: 1;
+        }
+
     </style>
 </head>
 <body>
@@ -159,12 +201,37 @@
             <div>HEAD  : <span id="indHeading">-</span></div>
         </div>
         <div id ="ui">
-            <button id="BtnSearch" onclick="openSearchModal()">검색</button>
-            <button id="BtnMyLoc" class="btn" onclick="myPos()">내위치</button>
-            <button id="BtnRoadMode" class="btn" onclick="roadMode()">거리뷰</button>
-            <button id="BtnOpenCam"class="btn" onclick="openCam()">카메라</button>
-            <button id="BtnCloseRoad" class="btn" onclick="closeRoad()" style="display: none;">로드뷰 닫기</button>
-            <button id="BtnCloseCam" class="btn" onclick="closeCam()" style="display: none;">카메라 닫기</button>
+            <button id="BtnSearch" onclick="openSearchModal()" title="검색" class="icon-btn">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <line x1="21" y1="21" x2="16.05" y2="16.05"></line>
+                </svg>
+            </button>
+            <button id="BtnMyLoc" onclick="myPos()" title="내위치" class="icon-btn">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="8"></circle>
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                </svg>
+            </button>
+            <button id="BtnRoadMode" onclick="roadMode()" title="로드뷰" class="icon-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor">
+                    <path d="M320-120v-160h80v160h-80Zm0-280v-160h80v160h-80Zm0-280v-160h80v160h-80ZM80-120l100-720h80L160-120H80Zm598.5-3q-5.5-3-8.5-9l-4-9q-23-48-64-82.5T532-302q-17-26-25-55t-8-59q0-78 57-130.5T692-599q78 0 133 56t55 135q0 29-8 56t-24 50q-29 44-70.5 78.5T714-141l-4 9q-3 6-8.5 9t-11.5 3q-6 0-11.5-3Zm68-230.5Q770-377 770-410t-23.5-56.5Q723-490 690-490t-56.5 23.5Q610-443 610-410t23.5 56.5Q657-330 690-330t56.5-23.5ZM494-599l-34-241h80l26 187q-20 11-38 24t-34 30Z"/>
+                </svg>
+            </button>
+            <button id="BtnOpenCam" onclick="openCam()" title="카메라 AR" class="icon-btn">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                    <text x="12" y="16" font-size="12" font-family="sans-serif" font-weight="900" fill="currentColor" stroke="none" text-anchor="middle">AR</text>
+                </svg>
+            </button>
+            <!-- 우측 상단 독립 닫기(X) 버튼들 -->
+            <button id="BtnCloseRoad" class="icon-btn close-btn" onclick="closeRoad()" title="로드뷰 닫기" style="display: none;">&times;</button>
+            <button id="BtnCloseCam" class="icon-btn close-btn" onclick="closeCam()" title="카메라 닫기" style="display: none;">&times;</button>
+            
             <input type="file" id="csvFile" accept=".csv">
         </div>
         <div id="map"></div>
@@ -352,12 +419,12 @@
             roadMode_On = false;
             map.setCursor('grab');
             map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-            BtnRoadMode.className = 'btn';
+            BtnRoadMode.className = 'icon-btn';
         } else { 
             roadMode_On = true;
             map.setCursor('crosshair');
             map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-            BtnRoadMode.className = 'selected_btn';
+            BtnRoadMode.className = 'icon-btn selected_btn';
         }
     }
 

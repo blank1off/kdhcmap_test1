@@ -1,14 +1,29 @@
 var MH_all = [];
 var mapHM_Over = [];
 var roadHM_Over = [];
+// MH 캐시 변수
+var MH_roadCachePos = null;
+var MH_roadOn = [];
+var MH_camCachePos = null;
+var MH_camOn = [];
 
 var HDH_all = [];
 var mapHDH_Over = [];
 var roadHDH_Over = [];
+// HDH 캐시 변수
+var HDH_roadCachePos = null;
+var HDH_roadOn = [];
+var HDH_camCachePos = null;
+var HDH_camOn = [];
 
 var MCR_all = [];
 var mapMCR_Over = [];
 var roadMCR_Over = [];
+// MCR 캐시 변수
+var MCR_roadCachePos = null;
+var MCR_roadOn = [];
+var MCR_camCachePos = null;
+var MCR_camOn = [];
 
 // 전역 팝업 객체 관리용 변수
 var activeInfoWindow = null;
@@ -62,7 +77,7 @@ function parseMH(csvText) {
         var line = lines[i].trim();
         if (!line) continue;
 
-        var columns = parseCSVLine(line);//line.split(',');
+        var columns = parseCSVLine(line);
 
         var EQP_NM = columns[0] ? columns[0].trim().replace(/^"|"$/g, '') : '';
         var MNHL_LT = columns[1] ? columns[1].trim() : '-';
@@ -93,35 +108,29 @@ function parseMH(csvText) {
 }
 
 function mapMH() {
-    // 기존 표시된 맨홀 제거
     for (var i = 0; i < mapHM_Over.length; i++) {
         mapHM_Over[i].setMap(null);
     }
     mapHM_Over = [];
 
-    // 지도가 일정 레벨 이상으로 멀어지면 표시 안 함 (필요시 조정 가능)
     if (map.getLevel() > 3) return;
 
     MH_all.forEach(function(mh) {
         if (!mapBounds.contain(mh.position)) return;
-        // CustomOverlay HTML 내용 (아이콘 + 하단 글씨)
-        // DOM 요소 생성
+
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
-        contentDiv.style.cursor = 'pointer'; // 클릭 가능 표시
+        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/mh.png" alt="맨홀">
             <span class="label1">${mh.name}</span>
         `;
 
-        // 오버레이 클릭 시 실행되는 함수 내부
         contentDiv.onclick = function(e) {
             if (e && e.stopPropagation) e.stopPropagation();
 
-            // 1. 모달에 바인딩할 데이터 준비
             var titleText = `${mh.name || '-'}`;
-
             var bodyContent = `
                 <b>규격(가로x세로x높이):</b> ${mh.lt || '-'} x ${mh.bt || '-'} x ${mh.hg || '-'} m<br>
                 <b>출입구 깊이:</b> ${mh.dp || '-'} m<br>
@@ -130,7 +139,6 @@ function mapMH() {
                 <b>설치일자:</b> ${mh.date || '-'}<br>
             `;
 
-            // 2. 모달 열기 함수 호출
             openMcrModal(titleText, bodyContent);
         };
 
@@ -143,24 +151,53 @@ function mapMH() {
 
         customOverlay.setMap(map);
         mapHM_Over.push(customOverlay);
-        
     });
 }
 
 function roadMH() {
-    // 기존 로드뷰 오버레이 정리
+    if (!roadPos) return;
+
+    var currentLat = roadPos.getLat();
+    var currentLng = roadPos.getLng();
+
+    var needRecache = true;
+    if (MH_roadCachePos) {
+        var movedDist = getDistanceMeter(
+            MH_roadCachePos.lat, MH_roadCachePos.lng,
+            currentLat, currentLng
+        );
+        if (movedDist < 30) {
+            needRecache = false;
+        }
+    }
+
+    if (needRecache) {
+        MH_roadCachePos = { lat: currentLat, lng: currentLng };
+        MH_roadOn = [];
+
+        var latDelta = 60 / 111320;
+        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+
+        MH_all.forEach(function(mh) {
+            var pos = mh.position;
+            var dLat = Math.abs(pos.getLat() - currentLat);
+            var dLng = Math.abs(pos.getLng() - currentLng);
+
+            if (dLat <= latDelta && dLng <= lngDelta) {
+                MH_roadOn.push(mh);
+            }
+        });
+    }
+
     for (var i = 0; i < roadHM_Over.length; i++) {
         roadHM_Over[i].setMap(null);
     }
     roadHM_Over = [];
 
-    // roadDistance(30m) 이내 맨홀만 필터링 후 오버레이 생성
-    MH_all.forEach(function(mh) {
-        var line = new kakao.maps.Polyline({path: [roadPos, mh.position]});
-        var dist = line.getLength(); // m 단위 반환
+    MH_roadOn.forEach(function(mh) {
+        var dist = getDistanceMeter(currentLat, currentLng, mh.position.getLat(), mh.position.getLng());
 
         if (dist <= roadMaxD) {
-            // CustomOverlay HTML 생성
             var content = `
                 <div class="overlay1" style="cursor:pointer;">
                     <img class="icon1" src="icon/mh.png" alt="맨홀">
@@ -175,28 +212,57 @@ function roadMH() {
                 yAnchor: 0.5
             });
 
-            // ★ 로드뷰(roadView)에 오버레이 올리기
             customOverlay.setMap(roadView);
             roadHM_Over.push(customOverlay);
         }
     });
 }
+
 function camMH() {
-    MH_all.forEach(function(mh) { // camDistance 이내 맨홀을 카메라 화면에 투영
-        // 내 위치 기준 동/북 거리(m). 맨홀은 지면이라 상하 = -CAMERA_HEIGHT
-        var east = (mh.position.getLng() - cmaPos.lng) * 111320 * cosLat;
-        var north = (mh.position.getLat() - cmaPos.lat) * 111320;
+    if (!cmaPos || !camRot || !camSVG) return;
+
+    var currentLat = cmaPos.lat;
+    var currentLng = cmaPos.lng;
+
+    var needRecache = true;
+    if (MH_camCachePos) {
+        var movedDist = getDistanceMeter(
+            MH_camCachePos.lat, MH_camCachePos.lng,
+            currentLat, currentLng
+        );
+        if (movedDist < 30) {
+            needRecache = false;
+        }
+    }
+
+    if (needRecache) {
+        MH_camCachePos = { lat: currentLat, lng: currentLng };
+        MH_camOn = [];
+
+        var latDelta = 60 / 111320;
+        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+
+        MH_all.forEach(function(mh) {
+            var pos = mh.position;
+            var dLat = Math.abs(pos.getLat() - currentLat);
+            var dLng = Math.abs(pos.getLng() - currentLng);
+
+            if (dLat <= latDelta && dLng <= lngDelta) {
+                MH_camOn.push(mh);
+            }
+        });
+    }
+
+    MH_camOn.forEach(function(mh) {
+        var east = (mh.position.getLng() - currentLng) * 111320 * cosLat;
+        var north = (mh.position.getLat() - currentLat) * 111320;
         var dist = Math.hypot(east, north);
         if (dist > camDistance) return;
 
         var p = camProject(camRot, east, north, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
-        if (!p) return;// 카메라 뒤쪽 또는 화면 밖
-        drawn.push({x: p.x, y: p.y, mh: mh});
+        if (!p) return;
 
-        // 시험용: foreignObject와 별개로 순수 SVG 점
-        //var dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        //dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", 6); dot.setAttribute("fill", "red");
-        //camSVG.appendChild(dot);
+        drawn.push({x: p.x, y: p.y, mh: mh});
 
         var content = `
             <div class="overlay1" style="cursor:pointer;">
@@ -205,10 +271,9 @@ function camMH() {
             </div>
         `;
 
-        // foreignObject (SVG 안에 HTML 표시)
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
-        foreignObj.setAttribute("x", p.x - 50);// 가로 중앙 맞춤
-        foreignObj.setAttribute("y", p.y - 12);// 아이콘(24px) 중심을 맨홀 위치에
+        foreignObj.setAttribute("x", p.x - 50);
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -241,11 +306,6 @@ function loadHDH(filePath) {
         })
         .then(function(csvText) {
             parseHDH(csvText);
-            // CSV 로드 후 바로 지도 표시
-            //mapHDH();
-            // 필요하면 현재 로드뷰 / 카메라 상태에 맞춰 호출
-            // roadHDH();
-            // camHDH();
         })
         .catch(function(error) {
             console.error("HDH 데이터 로드 오류:", error);
@@ -299,18 +359,15 @@ function parseHDH(csvText) {
 }
 
 function mapHDH() {
-    // 기존 HDH 제거
     for (var i = 0; i < mapHDH_Over.length; i++) {
         mapHDH_Over[i].setMap(null);
     }
 
     mapHDH_Over = [];
 
-    // 지도 레벨 제한
     if (map.getLevel() > 3) return;
 
     HDH_all.forEach(function(HDH) {
-        // 현재 화면 안에 있는 HDH만 표시
         if (!mapBounds.contain(HDH.position)) return;
 
         var iconPath = getHDHIcon(HDH.srCode);
@@ -318,28 +375,23 @@ function mapHDH() {
         contentDiv.className = 'overlay1';
         contentDiv.style.cursor = 'pointer';
 
-        // 오버레이 라벨 (건물명 표시)
         contentDiv.innerHTML = `
             <img class="icon1" src="${iconPath}" alt="핸드홀">
             <span class="label1">${HDH.name}(${HDH.srCode})</span>
         `;
 
-        // 오버레이 클릭 시 실행되는 함수 내부
         contentDiv.onclick = function(e) {
             if (e && e.stopPropagation) e.stopPropagation();
 
-            // 1. 모달에 바인딩할 데이터 준비
             var titleText = `${HDH.name}(${HDH.srCode})`;
-
             var bodyContent = `
                 <b>차단밸브 관경:</b> ${HDH.dia || '-'} A<br>
                 <b>밸브위치:</b> ${HDH.lc || '-'}<br>
-                <b>깊이:</b> ${HDH.HNDHL_DP || '-'} m<br>
+                <b>깊이:</b> ${HDH.dp || '-'} m<br>
                 <b>설치일:</b> ${HDH.date || '-'}<br>
                 <b>등급:</b> ${HDH.grade || '-'}<br>
             `;
 
-            // 2. 모달 열기 함수 호출
             openMcrModal(titleText, bodyContent);
         };
 
@@ -356,62 +408,113 @@ function mapHDH() {
 }
 
 function roadHDH() {
-    // 기존 로드뷰 HDH 제거
+    if (!roadPos) return;
+
+    var currentLat = roadPos.getLat();
+    var currentLng = roadPos.getLng();
+
+    var needRecache = true;
+    if (HDH_roadCachePos) {
+        var movedDist = getDistanceMeter(
+            HDH_roadCachePos.lat, HDH_roadCachePos.lng,
+            currentLat, currentLng
+        );
+        if (movedDist < 30) {
+            needRecache = false;
+        }
+    }
+
+    if (needRecache) {
+        HDH_roadCachePos = { lat: currentLat, lng: currentLng };
+        HDH_roadOn = [];
+
+        var latDelta = 60 / 111320;
+        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+
+        HDH_all.forEach(function(HDH) {
+            var pos = HDH.position;
+            var dLat = Math.abs(pos.getLat() - currentLat);
+            var dLng = Math.abs(pos.getLng() - currentLng);
+
+            if (dLat <= latDelta && dLng <= lngDelta) {
+                HDH_roadOn.push(HDH);
+            }
+        });
+    }
+
     for (var i = 0; i < roadHDH_Over.length; i++) {
         roadHDH_Over[i].setMap(null);
     }
-
     roadHDH_Over = [];
 
-    if (!roadPos) return;
+    HDH_roadOn.forEach(function(HDH) {
+        var dist = getDistanceMeter(currentLat, currentLng, HDH.position.getLat(), HDH.position.getLng());
+        
+        if (dist <= roadMaxD) {
+            var iconPath = getHDHIcon(HDH.srCode);
+            var content = `
+                <div class="overlay1" style="cursor:pointer;">
+                    <img class="icon1" src="${iconPath}" alt="HDH">
+                    <span class="label1">${HDH.name} (${Math.round(dist)}m)</span>
+                </div>
+            `;
 
-    HDH_all.forEach(function(HDH) {
-        var line = new kakao.maps.Polyline({path: [roadPos, HDH.position]});
-        var dist = line.getLength();
-        // 기존 roadMaxD 사용
-        if (dist > roadMaxD) return;
+            var customOverlay = new kakao.maps.CustomOverlay({
+                position: HDH.position,
+                content: content,
+                xAnchor: 0.5,
+                yAnchor: 0.5
+            });
 
-        var iconPath = getHDHIcon(HDH.srCode);
-
-        var content = `
-            <div class="overlay1" style="cursor:pointer;">
-                <img class="icon1" src="${iconPath}" alt="HDH">
-                <span class="label1">${HDH.name} (${Math.round(dist)}m)</span>
-            </div>
-        `;
-
-        var customOverlay = new kakao.maps.CustomOverlay({
-            position: HDH.position,
-            content: content,
-            xAnchor: 0.5,
-            yAnchor: 0.5
-        });
-
-        customOverlay.setMap(roadView);
-        roadHDH_Over.push(customOverlay);
+            customOverlay.setMap(roadView);
+            roadHDH_Over.push(customOverlay);
+        }
     });
 }
 
 function camHDH() {
-    HDH_all.forEach(function(HDH) {
-        // 내 위치 기준 동 / 북 거리
-        var east = (mh.position.getLng() - cmaPos.lng) * 111320 * cosLat;
-        var north = (mh.position.getLat() - cmaPos.lat) * 111320;
-        var dist = Math.hypot(east, north);
-        if (dist > camDistance) return; // 카메라 표시 거리 제한
+    if (!cmaPos || !camRot || !camSVG) return;
 
-        var p = camProject(
-            camRot,
-            east,
-            north,
-            -CAMERA_HEIGHT,
-            camWt,
-            camHt,
-            f,
-            screenAngle
+    var currentLat = cmaPos.lat;
+    var currentLng = cmaPos.lng;
+
+    var needRecache = true;
+    if (HDH_camCachePos) {
+        var movedDist = getDistanceMeter(
+            HDH_camCachePos.lat, HDH_camCachePos.lng,
+            currentLat, currentLng
         );
+        if (movedDist < 30) {
+            needRecache = false;
+        }
+    }
 
-        if (!p) return; // 카메라 뒤쪽 또는 화면 밖
+    if (needRecache) {
+        HDH_camCachePos = { lat: currentLat, lng: currentLng };
+        HDH_camOn = [];
+
+        var latDelta = 60 / 111320;
+        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+
+        HDH_all.forEach(function(HDH) {
+            var pos = HDH.position;
+            var dLat = Math.abs(pos.getLat() - currentLat);
+            var dLng = Math.abs(pos.getLng() - currentLng);
+
+            if (dLat <= latDelta && dLng <= lngDelta) {
+                HDH_camOn.push(HDH);
+            }
+        });
+    }
+
+    HDH_camOn.forEach(function(HDH) {
+        var east = (HDH.position.getLng() - currentLng) * 111320 * cosLat;
+        var north = (HDH.position.getLat() - currentLat) * 111320;
+        var dist = Math.hypot(east, north);
+        if (dist > camDistance) return;
+
+        var p = camProject(camRot, east, north, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+        if (!p) return;
 
         var iconPath = getHDHIcon(HDH.srCode);
 
@@ -422,10 +525,9 @@ function camHDH() {
             </div>
         `;
 
-        // foreignObject (SVG 안에 HTML 표시)
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
-        foreignObj.setAttribute("x", p.x - 50);// 가로 중앙 맞춤
-        foreignObj.setAttribute("y", p.y - 12);// 아이콘(24px) 중심을 맨홀 위치에
+        foreignObj.setAttribute("x", p.x - 50);
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -446,10 +548,6 @@ function loadMCR(filePath) {
         })
         .then(function(csvText) {
             parseMCR(csvText);
-            //mapMCR(); // CSV 로드 후 바로 지도 표시
-            // 필요하면 현재 로드뷰 / 카메라 상태에 맞춰 호출
-            // roadMCR();
-            // camMCR();
         })
         .catch(function(error) {
             console.error("MCR 데이터 로드 오류:", error);
@@ -468,8 +566,6 @@ function parseMCR(csvText) {
 
         var columns = parseCSVLine(line);
 
-        // 컬럼 매핑 (MCR.csv 헤더 구조)
-        // INDEX_KEY(0), BUILD_ID(1), ROOM_NAME(2), ROOM_ID(3), BUILD_NAME(4), LNG(5), LAT(6)...
         var buildId = columns[1] ? columns[1].trim() : '-';
         var roomName = columns[2] ? columns[2].trim() : '-';
         var roomId = columns[3] ? columns[3].trim() : '-';
@@ -493,13 +589,13 @@ function parseMCR(csvText) {
                 roomName: roomName,
                 buildId: buildId,
                 roomId: roomId,
-                dia: valveDia,       // 차단밸브 관경
-                heat: heatLoad,      // 열부하
-                house: numHouse,     // 세대수
-                roomLc: roomLc,      // 기계실 위치
-                valveLc: valveLc,    // 밸브 위치
-                valveKey: valveKey,  // 밸브 형태
-                alt: alt,            // 고도
+                dia: valveDia,
+                heat: heatLoad,
+                house: numHouse,
+                roomLc: roomLc,
+                valveLc: valveLc,
+                valveKey: valveKey,
+                alt: alt,
                 position: new kakao.maps.LatLng(lat, lng)
             });
         } catch (e) {
@@ -507,7 +603,6 @@ function parseMCR(csvText) {
         }
     }
 }
-
 
 function mapMCR() {
     for (var i = 0; i < mapMCR_Over.length; i++) {
@@ -525,20 +620,15 @@ function mapMCR() {
         contentDiv.className = 'overlay1';
         contentDiv.style.cursor = 'pointer';
 
-        // 오버레이 라벨 (건물명 표시)
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/MCR.png" alt="기계실">
             <span class="label1">${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})</span>
         `;
-           //<span class="MCR-label" style="font-size:12px; font-weight:bold; background:#fff; padding:2px 4px; border-radius:3px; border:1px solid #333;">${MCR.buildName}</span>
 
-        // 오버레이 클릭 시 실행되는 mapMCR 함수 내부
         contentDiv.onclick = function(e) {
             if (e && e.stopPropagation) e.stopPropagation();
 
-            // 1. 모달에 바인딩할 데이터 준비
             var titleText = `${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})`;
-
             var bodyContent = `
                 <b>차단밸브 관경:</b> ${MCR.dia || '-'} A<br>
                 <b>열부하:</b> ${MCR.heat || '-'} Mcal/h<br>
@@ -548,7 +638,6 @@ function mapMCR() {
                 <b>밸브 형태:</b> ${MCR.valveKey || '-'}<br>
             `;
 
-            // 2. 모달 열기 함수 호출
             openMcrModal(titleText, bodyContent);
         };
 
@@ -565,71 +654,123 @@ function mapMCR() {
 }
 
 function roadMCR() {
-    // 기존 로드뷰 MCR 제거
+    if (!roadPos) return;
+
+    var currentLat = roadPos.getLat();
+    var currentLng = roadPos.getLng();
+
+    var needRecache = true;
+    if (MCR_roadCachePos) {
+        var movedDist = getDistanceMeter(
+            MCR_roadCachePos.lat, MCR_roadCachePos.lng,
+            currentLat, currentLng
+        );
+        if (movedDist < 30) {
+            needRecache = false;
+        }
+    }
+
+    if (needRecache) {
+        MCR_roadCachePos = { lat: currentLat, lng: currentLng };
+        MCR_roadOn = [];
+
+        var latDelta = 60 / 111320;
+        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+
+        MCR_all.forEach(function(MCR) {
+            var pos = MCR.position;
+            var dLat = Math.abs(pos.getLat() - currentLat);
+            var dLng = Math.abs(pos.getLng() - currentLng);
+
+            if (dLat <= latDelta && dLng <= lngDelta) {
+                MCR_roadOn.push(MCR);
+            }
+        });
+    }
+
     for (var i = 0; i < roadMCR_Over.length; i++) {
         roadMCR_Over[i].setMap(null);
     }
     roadMCR_Over = [];
 
-    if (!roadPos) return;
+    MCR_roadOn.forEach(function(MCR) {
+        var dist = getDistanceMeter(currentLat, currentLng, MCR.position.getLat(), MCR.position.getLng());
 
-    MCR_all.forEach(function(MCR) {
-        var line = new kakao.maps.Polyline({path: [roadPos, MCR.position]});
-        var dist = line.getLength();
-        // 기존 roadMaxD 사용
-        if (dist > roadMaxD) return;
+        if (dist <= roadMaxD) {
+            var content = `
+                <div class="overlay1" style="cursor:pointer;">
+                    <img class="icon1" src="icon/MCR.png" alt="기계실">
+                    <span class="label1">${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})</span>
+                </div>
+            `;
 
-        var content = `
-            <div class="overlay1">
-                <img class="icon1" src="icon/MCR.png" alt="기계실">
-                <span class="label1">${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})</span>
-            </div>
-        `;
+            var customOverlay = new kakao.maps.CustomOverlay({
+                position: MCR.position,
+                content: content,
+                xAnchor: 0.5,
+                yAnchor: 0.5
+            });
 
-        var customOverlay = new kakao.maps.CustomOverlay({
-            position: MCR.position,
-            content: content,
-            xAnchor: 0.5,
-            yAnchor: 0.5
-        });
-
-        customOverlay.setMap(roadView);
-        roadMCR_Over.push(customOverlay);
+            customOverlay.setMap(roadView);
+            roadMCR_Over.push(customOverlay);
+        }
     });
 }
 
 function camMCR() {
-    MCR_all.forEach(function(MCR) {
-        // 내 위치 기준 동 / 북 거리
-        var east = (mh.position.getLng() - cmaPos.lng) * 111320 * cosLat;
-        var north = (mh.position.getLat() - cmaPos.lat) * 111320;
-        var dist = Math.hypot(east, north);
-        if (dist > camDistance) return; // 카메라 표시 거리 제한
+    if (!cmaPos || !camRot || !camSVG) return;
 
-        var p = camProject(
-            camRot,
-            east,
-            north,
-            -CAMERA_HEIGHT,
-            camWt,
-            camHt,
-            f,
-            screenAngle
+    var currentLat = cmaPos.lat;
+    var currentLng = cmaPos.lng;
+
+    var needRecache = true;
+    if (MCR_camCachePos) {
+        var movedDist = getDistanceMeter(
+            MCR_camCachePos.lat, MCR_camCachePos.lng,
+            currentLat, currentLng
         );
+        if (movedDist < 30) {
+            needRecache = false;
+        }
+    }
 
-        if (!p) return; // 카메라 뒤쪽 또는 화면 밖
+    if (needRecache) {
+        MCR_camCachePos = { lat: currentLat, lng: currentLng };
+        MCR_camOn = [];
+
+        var latDelta = 60 / 111320;
+        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+
+        MCR_all.forEach(function(MCR) {
+            var pos = MCR.position;
+            var dLat = Math.abs(pos.getLat() - currentLat);
+            var dLng = Math.abs(pos.getLng() - currentLng);
+
+            if (dLat <= latDelta && dLng <= lngDelta) {
+                MCR_camOn.push(MCR);
+            }
+        });
+    }
+
+    MCR_camOn.forEach(function(MCR) {
+        var east = (MCR.position.getLng() - currentLng) * 111320 * cosLat;
+        var north = (MCR.position.getLat() - currentLat) * 111320;
+        var dist = Math.hypot(east, north);
+        if (dist > camDistance) return;
+
+        var p = camProject(camRot, east, north, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+        if (!p) return;
 
         var content = `
-            <div class="overlay1">
+            <div class="overlay1" style="cursor:pointer;">
                 <img class="icon1" src="icon/MCR.png" alt="기계실">
                 <span class="label1">${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})</span>
             </div>
         `;
 
-        // foreignObject (SVG 안에 HTML 표시)
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
-        foreignObj.setAttribute("x", p.x - 50);// 가로 중앙 맞춤
-        foreignObj.setAttribute("y", p.y - 12);// 아이콘(24px) 중심을 맨홀 위치에
+        foreignObj.setAttribute("x", p.x - 50);
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
