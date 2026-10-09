@@ -440,21 +440,9 @@ function roadPPG(){
             return;
         }
 
-        var labelText = ttPPG.diaCode + 'A' + '('+ ttPPG.LINE_NM +')';
         var labelClass = (ttPPG.srCode === 'S') ? 'road-s-pipe' : 'road-r-pipe';
         var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
-        var bgColor = '#000000';
 
-        /*var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        textNode.setAttribute('x', x.toFixed(1));
-        textNode.setAttribute('y', y.toFixed(1));
-        textNode.setAttribute('fill', labelColor);
-        textNode.setAttribute('stroke', bgColor);
-        textNode.setAttribute('paint-order', 'stroke fill');
-        textNode.setAttribute('class', labelClass);
-        textNode.setAttribute('text-anchor', 'middle');
-        textNode.setAttribute('dominant-baseline', 'middle');
-        textNode.textContent = labelText;*/
         var foreignObj = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
         foreignObj.setAttribute('x', (x - 60).toFixed(1)); // 너비 절반만큼 왼쪽 이동 (중앙 정렬)
         foreignObj.setAttribute('y', (y - 20).toFixed(1)); // 높이 절반만큼 위로 이동

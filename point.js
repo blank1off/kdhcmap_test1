@@ -25,6 +25,10 @@ var MCR_roadOn = [];
 var MCR_camCachePos = null;
 var MCR_camOn = [];
 
+var ETC_all = [];
+var mapETC_Over = [];
+var roadETC_Over = [];
+
 // 전역 팝업 객체 관리용 변수
 var activeInfoWindow = null;
 
@@ -768,6 +772,188 @@ function camMCR() {
             <div class="overlay1" style="cursor:pointer;">
                 <img class="icon1" src="icon/MCR.png" alt="기계실">
                 <span class="label1">${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})</span>
+            </div>
+        `;
+
+        var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+        foreignObj.setAttribute("x", p.x - 50);
+        foreignObj.setAttribute("y", p.y - 12);
+        foreignObj.setAttribute("width", "100");
+        foreignObj.setAttribute("height", "60");
+        foreignObj.innerHTML = content;
+
+        camSVG.appendChild(foreignObj);
+    });
+}
+
+
+//////////
+function getETCIcon(type) {
+    if (type === '열원') {
+        return 'icon/열원.png';
+    }
+    if (type === '가압장') {
+        return 'icon/가압장.png';
+    }
+    if (type === '소각장') {
+        return 'icon/소각장.png';
+    }
+
+    return 'icon/ETC_r.png';
+}
+
+function loadETC(filePath) {
+    fetch(filePath)
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error("ETC CSV 파일 로드 실패");
+            }
+            return response.text();
+        })
+        .then(function(csvText) {
+            parseETC(csvText);
+        })
+        .catch(function(error) {
+            console.error("ETC 데이터 로드 오류:", error);
+        });
+}
+
+function parseETC(csvText) {
+    ETC_all = [];
+
+    var lines = csvText.trim().split(/\r?\n/);
+    if (lines.length <= 1) return;
+
+    for (var i = 1; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
+
+        var columns = parseCSVLine(line);
+
+        var TYPE = columns[0] ? columns[0].trim() : '';
+        var NAME = columns[1] ? columns[1].trim() : '';
+        var lat = columns[2] ? parseFloat(columns[2].trim()) : 0;
+        var lng = columns[3] ? parseFloat(columns[3].trim()) : 0;
+        var ETC1 = columns[4] ? columns[4].trim() : '';
+        var ETC2 = columns[5] ? columns[5].trim() : '';
+        var ETC3 = columns[6] ? columns[6].trim() : '';
+
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
+
+        try {
+            ETC_all.push({
+                TYPE: TYPE,
+                NAME: NAME,
+                ETC1: ETC1,
+                ETC2: ETC2,
+                ETC3: ETC3,
+                position: new kakao.maps.LatLng(lat, lng),
+            });
+        }
+        catch (e) {
+            console.error(i + "번째 ETC 좌표 변환 실패:",e);
+        }
+    }
+    mapETC();
+}
+
+function mapETC() {
+    for (var i = 0; i < mapETC_Over.length; i++) {
+        mapETC_Over[i].setMap(null);
+    }
+
+    mapETC_Over = [];
+
+    if (map.getLevel() > 3) return;
+
+    ETC_all.forEach(function(ETC) {
+        if (!mapBounds.contain(ETC.position)) return;
+
+        var iconPath = getETCIcon(ETC.TYPE);
+        var contentDiv = document.createElement('div');
+        contentDiv.className = 'overlay1';
+        contentDiv.style.cursor = 'pointer';
+
+        contentDiv.innerHTML = `
+            <img class="icon1" src="${iconPath}" alt="기타">
+            <span class="label1">${ETC.NAME}</span>
+        `;
+
+        contentDiv.onclick = function(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+
+            var titleText = `${ETC.NAME}`;
+            var bodyContent = `
+                <b>차단밸브 관경:</b> ${ETC.ETC1 || '-'}<br>
+            `;
+
+            openMcrModal(titleText, bodyContent);
+        };
+
+        var customOverlay = new kakao.maps.CustomOverlay({
+            position: ETC.position,
+            content: contentDiv,
+            xAnchor: 0.5,
+            yAnchor: 0.5
+        });
+
+        customOverlay.setMap(map);
+        mapETC_Over.push(customOverlay);
+    });
+}
+
+function roadETC() {
+    if (!roadPos) return;
+
+    for (var i = 0; i < roadETC_Over.length; i++) {
+        roadETC_Over[i].setMap(null);
+    }
+    roadETC_Over = [];
+
+    ETC_all.forEach(function(ETC) {
+        var line = new kakao.maps.Polyline({path: [roadPos, ETC.position]});
+        var dist = line.getLength();
+        // 기존 roadMaxD 사용
+        if (dist > roadMaxD) return;
+        
+        var iconPath = getETCIcon(ETC.TYPE);
+        var content = `
+            <div class="overlay1" style="cursor:pointer;">
+                <img class="icon1" src="${iconPath}" alt="ETC">
+                <span class="label1">${ETC.NAME}<br>(${Math.round(dist)}m)</span>
+            </div>
+        `;
+
+        var customOverlay = new kakao.maps.CustomOverlay({
+            position: ETC.position,
+            content: content,
+            xAnchor: 0.5,
+            yAnchor: 0.5
+        });
+
+        customOverlay.setMap(roadView);
+        roadETC_Over.push(customOverlay);
+    });
+}
+
+function camETC() {
+    if (!cmaPos || !camRot || !camSVG) return;
+
+    ETC_all.forEach(function(ETC) {
+        var east = (ETC.position.getLng() - cmaPos.lng) * 111320 * cosLat;
+        var north = (ETC.position.getLat() - cmaPos.lat) * 111320;
+        var dist = Math.hypot(east, north);
+        if (dist > camDistance) return;
+
+        var p = camProject(camRot, east, north, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+        if (!p) return;
+
+        var iconPath = getETCIcon(ETC.TYPE);
+
+        var content = `
+            <div class="overlay1" style="cursor:pointer;">
+                <img class="icon1" src="${iconPath}" alt="ETC">
+                <span class="label1">${ETC.NAME}<br>(${Math.round(dist)}m)</span>
             </div>
         `;
 

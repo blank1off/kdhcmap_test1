@@ -17,6 +17,7 @@ function mapUpdate() {
     mapMH();
     mapMCR();
     mapHDH();
+    mapETC();
 }
 
 function openRoad(position) {
@@ -47,6 +48,12 @@ function closeRoad() {
     document.getElementById('BtnOpenCam').style.display = 'block';
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
+
+    // 2. 지도 화면을 현재 위치로 이동 및 Zoom 레벨 최대로 설정
+    if (roadPos) { // 또는 현재 GPS 위치 변수 (cmaPos 등)
+        map.setCenter(roadPos); 
+        map.setLevel(1); // 레벨 1(최대 확대)로 부드럽게 이동
+    }
 }
 
 function roadEvent() {
@@ -77,6 +84,7 @@ function roadUpdate() {
     roadMH();
     roadMCR();
     roadHDH();
+    roadETC();
 }
 
 var camUpdateTimer = null;
@@ -244,6 +252,13 @@ function closeCam() {
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
+    // 2. 지도 화면을 현재 위치로 이동 및 Zoom 레벨 최대로 설정
+    if (cmaPos) {
+        var currentLatLng = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
+        map.setCenter(currentLatLng);
+        map.setLevel(1);
+    }
+
     if (camStream) {
         camStream.getTracks().forEach(function(track) {
             track.stop();
@@ -365,6 +380,7 @@ function drawCam() {
     camMH();
     camMCR();
     camHDH();
+    camETC();
 }
 
 

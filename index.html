@@ -88,6 +88,9 @@
             font-weight: bold;
             cursor: pointer;
             user-select: none;
+            font-size: 11px;
+            font-weight: bold;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; 
         }
 
         .road-r-pipe {
@@ -96,6 +99,9 @@
             font-weight: bold;
             cursor: pointer;
             user-select: none;
+            font-size: 11px;
+            font-weight: bold;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; 
         }
         
 
@@ -307,9 +313,10 @@
         reader.onload = function(event) {
             const csvText = event.target.result;
             //parsePPG(csvText);
-            parseMH(csvText);
+            //parseMH(csvText);
             //parseMCR(csvText);
             //parseHDH(csvText);
+            parseETC(csvText);
             mapUpdate();
         };
         reader.readAsText(file, 'utf-8');
@@ -419,6 +426,7 @@
         loadMH('bundang/MH.csv');
         loadMCR('bundang/MCR.csv');
         loadHDH('bundang/HDH.csv');
+        loadETC('bundang/ETC.csv');
         mapUpdate();
     });
 
@@ -437,6 +445,7 @@
                     position.coords.longitude
                 );
                 map.panTo(myPos);// 지도 이동
+                map.setLevel(1, { animate: true });
 
                 // 기존 내 위치 마커 제거
                 if (myPosMarker) myPosMarker.setMap(null);
