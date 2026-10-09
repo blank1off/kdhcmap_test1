@@ -127,13 +127,13 @@ function mapPPG(){
 
             // ★ PPG 폴리라인 클릭 이벤트 추가
             kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
-                var titleText = `${ppg.LINE_NM} (${ppg.srCode || '-'})`;
+                var titleText = `${PPG.LINE_NM} (${PPG.srCode || '-'})`;
                 var bodyContent = `
-                    <b>설비ID:</b> ${ppg.eqpId || '-'}<br>
-                    <b>관경:</b> ${ppg.pipeDia || '-'} mm<br>
-                    <b>설치일자:</b> ${ppg.competDe || '-'}<br>
-                    <b>상태:</b> ${ppg.qltyGrade || '-'}<br>
-                    <b>평균깊이:</b> ${ppg.avgDph || '-'} m
+                    <b>설비ID:</b> ${PPG.eqpId || '-'}<br>
+                    <b>관경:</b> ${PPG.pipeDia || '-'} mm<br>
+                    <b>설치일자:</b> ${PPG.competDe || '-'}<br>
+                    <b>상태:</b> ${PPG.qltyGrade || '-'}<br>
+                    <b>평균깊이:</b> ${PPG.avgDph || '-'} m
                 `;
                 
                 openMcrModal(titleText, bodyContent);
