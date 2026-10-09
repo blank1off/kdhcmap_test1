@@ -125,6 +125,20 @@ function mapPPG(){
                 strokeStyle: 'solid'
             });
 
+            // ★ PPG 폴리라인 클릭 이벤트 추가
+            kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
+                var titleText = `배관 정보 (${ppg.pipeType || '배관'})`;
+                var bodyContent = `
+                    <b>설비ID:</b> ${ppg.eqpId || '-'}<br>
+                    <b>관경:</b> ${ppg.pipeDia || '-'} mm<br>
+                    <b>설치년도:</b> ${ppg.instlYr || '-'}<br>
+                    <b>매설깊이:</b> ${ppg.dp || '-'} m<br>
+                    <b>위치:</b> ${ppg.lc || '-'}
+                `;
+                
+                openMcrModal(titleText, bodyContent);
+            });
+
             poly.setMap(map);
             mapPPG_poly.push(poly);
             PPG_on.push(PPG);
