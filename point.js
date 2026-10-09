@@ -105,6 +105,7 @@ function parseMH(csvText) {
         }
     }
     console.log("맨홀 전체 개수:", MH_all.length);
+    mapMH();
 }
 
 function mapMH() {
@@ -356,6 +357,7 @@ function parseHDH(csvText) {
     }
 
     console.log("HDH 전체 개수:", HDH_all.length);
+    mapHDH();
 }
 
 function mapHDH() {
@@ -602,6 +604,7 @@ function parseMCR(csvText) {
             console.error(i + "번째 행 MCR(기계실) 좌표 변환 실패:", e);
         }
     }
+    mapMCR();
 }
 
 function mapMCR() {
@@ -622,7 +625,7 @@ function mapMCR() {
 
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/MCR.png" alt="기계실">
-            <span class="label1">${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})</span>
+            <span class="label1">${MCR.buildName}(${MCR.roomName})</span>
         `;
 
         contentDiv.onclick = function(e) {

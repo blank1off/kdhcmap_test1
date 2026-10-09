@@ -440,12 +440,12 @@ function roadPPG(){
             return;
         }
 
-        var labelText = ttPPG.diaCode + 'A' + ' ('+ ttPPG.LINE_NM +')';
+        var labelText = ttPPG.diaCode + 'A' + '('+ ttPPG.LINE_NM +')';
         var labelClass = (ttPPG.srCode === 'S') ? 'road-s-pipe' : 'road-r-pipe';
         var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
         var bgColor = '#000000';
 
-        var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        /*var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         textNode.setAttribute('x', x.toFixed(1));
         textNode.setAttribute('y', y.toFixed(1));
         textNode.setAttribute('fill', labelColor);
@@ -454,10 +454,24 @@ function roadPPG(){
         textNode.setAttribute('class', labelClass);
         textNode.setAttribute('text-anchor', 'middle');
         textNode.setAttribute('dominant-baseline', 'middle');
-        textNode.textContent = labelText;
+        textNode.textContent = labelText;*/
+        var foreignObj = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+        foreignObj.setAttribute('x', (x - 60).toFixed(1)); // 너비 절반만큼 왼쪽 이동 (중앙 정렬)
+        foreignObj.setAttribute('y', (y - 20).toFixed(1)); // 높이 절반만큼 위로 이동
+        foreignObj.setAttribute('width', '120');
+        foreignObj.setAttribute('height', '40');
 
-        roadSVG.appendChild(textNode);
-        roadPPG_label.push(textNode);
+        var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
+
+        // HTML 형식으로 <br>을 써서 자연스럽게 줄바꿈
+        foreignObj.innerHTML = `
+            <div style="text-align: center; color: ${labelColor}; font-size: 11px; font-weight: bold; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; line-height: 1.2;">
+                ${ttPPG.diaCode}A<br>(${ttPPG.LINE_NM})
+            </div>
+        `;
+
+        roadSVG.appendChild(foreignObj);
+        roadPPG_label.push(foreignObj);
     });
 }
 
