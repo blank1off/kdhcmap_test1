@@ -202,7 +202,7 @@ function roadMH() {
             var content = `
                 <div class="overlay1" style="cursor:pointer;">
                     <img class="icon1" src="icon/mh.png" alt="맨홀">
-                    <span class="label1">${mh.name} (${Math.round(dist)}m)</span>
+                    <span class="label1">${mh.name}<br>(${Math.round(dist)}m)</span>
                 </div>
             `;
 
@@ -268,7 +268,7 @@ function camMH() {
         var content = `
             <div class="overlay1" style="cursor:pointer;">
                 <img class="icon1" src="icon/mh.png" alt="맨홀">
-                <span class="label1">${mh.name} (${Math.round(dist)}m)</span>
+                <span class="label1">${mh.name}<br>(${Math.round(dist)}m)</span>
             </div>
         `;
 
@@ -457,7 +457,7 @@ function roadHDH() {
             var content = `
                 <div class="overlay1" style="cursor:pointer;">
                     <img class="icon1" src="${iconPath}" alt="HDH">
-                    <span class="label1">${HDH.name} (${Math.round(dist)}m)</span>
+                    <span class="label1">${HDH.name}<br>(${Math.round(dist)}m)</span>
                 </div>
             `;
 
@@ -523,7 +523,7 @@ function camHDH() {
         var content = `
             <div class="overlay1" style="cursor:pointer;">
                 <img class="icon1" src="${iconPath}" alt="HDH">
-                <span class="label1">${HDH.name} (${Math.round(dist)}m)</span>
+                <span class="label1">${HDH.name}<br>(${Math.round(dist)}m)</span>
             </div>
         `;
 
