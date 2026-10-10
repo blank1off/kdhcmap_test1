@@ -42,6 +42,7 @@ function closeRoad() {
     cMode = "map";
     allNone();
     document.getElementById('map').style.display = 'block';
+    document.getElementById('siteSel').style.display = 'block';
     document.getElementById('BtnSearch').style.display = 'block'; // 추가
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
@@ -248,6 +249,7 @@ function closeCam() {
     cMode = "map";
     allNone();
     document.getElementById('map').style.display = 'block';
+    document.getElementById('siteSel').style.display = 'block';
     document.getElementById('BtnSearch').style.display = 'block'; // 추가
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
