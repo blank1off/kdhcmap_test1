@@ -563,31 +563,32 @@ function camPPG() {
     });
 }
 
-// 위경도 → 카메라 좌표 {dx:오른쪽, dy:위, fwd:앞} (m). camProject 앞부분과 같은 계산 (camRot, cosLat, cmaPos 전역 사용)
+// 위경도 → 카메라 좌표 {dx:오른쪽, dy:위, fwd:앞} (m). test7.js camProject의 1단계와 같은 계산 (camRot, cosLat, cmaPos 전역 사용)
+// 선분은 양 끝을 따로 투영하면 한쪽이 카메라 뒤일 때 뒤집히므로, 카메라 좌표에서 먼저 자르려고 중간 단계를 분리
 function camSpaceOf(pos) {
-    var east = (pos.getLng() - cmaPos.lng) * 111320 * cosLat;
-    var north = (pos.getLat() - cmaPos.lat) * 111320;
-    var up = -CAMERA_HEIGHT;
+    var east = (pos.getLng() - cmaPos.lng) * 111320 * cosLat;// 내 위치 기준 동쪽 m
+    var north = (pos.getLat() - cmaPos.lat) * 111320;// 북쪽 m
+    var up = -CAMERA_HEIGHT;// 배관은 지면(또는 그 아래)이라 카메라보다 CAMERA_HEIGHT 아래
     var R = camRot;
     return {
-        dx: R[0] * east + R[3] * north + R[6] * up,
-        dy: R[1] * east + R[4] * north + R[7] * up,
-        fwd: -(R[2] * east + R[5] * north + R[8] * up)
+        dx: R[0] * east + R[3] * north + R[6] * up,// 카메라 기준 오른쪽 m
+        dy: R[1] * east + R[4] * north + R[7] * up,// 위 m
+        fwd: -(R[2] * east + R[5] * north + R[8] * up)// 앞 m (음수 = 카메라 뒤)
     };
 }
 
-// 카메라 좌표 → 화면 px. fwd > 0 전제 (camProject 뒷부분과 같은 계산, 화면 밖이어도 값 돌려줌)
+// 카메라 좌표 → 화면 px. fwd > 0 전제 (camProject 2·3단계와 같은 계산, 화면 밖이어도 값 돌려줌. SVG가 알아서 잘라 보여줌)
 function camPx(c) {
-    var cs = Math.cos(screenAngle * RAD), sn = Math.sin(screenAngle * RAD);
+    var cs = Math.cos(screenAngle * RAD), sn = Math.sin(screenAngle * RAD);// 가로모드 회전
     return {
-        x: camWt / 2 + f * (cs * c.dx - sn * c.dy) / c.fwd,
-        y: camHt / 2 - f * (sn * c.dx + cs * c.dy) / c.fwd
+        x: camWt / 2 + f * (cs * c.dx - sn * c.dy) / c.fwd,// 핀홀: px = f · 옆/앞
+        y: camHt / 2 - f * (sn * c.dx + cs * c.dy) / c.fwd// 화면 y는 아래가 +라 부호 반전
     };
 }
 
 // 뒤쪽 점 a를 a-b 선분 위에서 fwd = CAM_NEAR 지점으로 이동 (카메라 좌표는 직선이라 선형 보간)
 function clipNear(a, b) {
-    var t = (CAM_NEAR - a.fwd) / (b.fwd - a.fwd);
+    var t = (CAM_NEAR - a.fwd) / (b.fwd - a.fwd);// a에서 b로 가는 비율 중 fwd가 CAM_NEAR가 되는 지점 (0~1)
     return {
         dx: a.dx + (b.dx - a.dx) * t,
         dy: a.dy + (b.dy - a.dy) * t,
