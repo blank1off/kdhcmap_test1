@@ -138,21 +138,19 @@ async function openCam() {
             '<div>SRC : <span id="indSrc">-</span></div>' +
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
-        document.getElementById("ui").insertAdjacentHTML("beforeend",
-            '<button id="BtnFixReset" class="icon-btn" style="width:auto; padding:0 10px; border-radius:20px; font-size:12px;" onclick="resetFix()" title="방위 보정 초기화">보정 0</button>');
         document.getElementById("camBox").addEventListener("click", camTap);
-        // 위치 보정 패드 (camBox 밖에 둬야 탭이 camTap으로 안 감)
+        // 보정 패드: 4방향 = 내 위치 1m 이동, 중앙 = 방위+위치 보정 초기화. 하단 중앙 (camBox 밖에 둬야 탭이 camTap으로 안 감)
         document.getElementById("box1").insertAdjacentHTML("beforeend",
-            '<div id="camPad" style="position:fixed; left:10px; bottom:10px; z-index:999; display:none; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px); gap:4px;">' +
+            '<div id="camPad" style="position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:999; display:none; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:6px;">' +
             '<span></span><button class="icon-btn" onclick="nudgePos(0,1)" title="내 위치 북쪽 1m">▲</button><span></span>' +
             '<button class="icon-btn" onclick="nudgePos(-1,0)" title="내 위치 서쪽 1m">◀</button>' +
-            '<button class="icon-btn" onclick="resetPos()" title="위치 보정 초기화" style="font-size:12px;">0</button>' +
+            '<button class="icon-btn" onclick="resetAll()" title="보정 초기화 (방위+위치)" style="font-size:12px;">0</button>' +
             '<button class="icon-btn" onclick="nudgePos(1,0)" title="내 위치 동쪽 1m">▶</button>' +
             '<span></span><button class="icon-btn" onclick="nudgePos(0,-1)" title="내 위치 남쪽 1m">▼</button><span></span>' +
             '</div>');
     }
-    document.getElementById("BtnFixReset").style.display = "block";
     document.getElementById("camPad").style.display = "grid";
+    document.getElementById("camIndicator").style.bottom = "150px";// 패드(132px) 위로
 
     // 이전 상태 초기화
     cmaPos = null;
@@ -251,10 +249,9 @@ function closeCam() {
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
     document.getElementById('BtnOpenCam').style.display = 'block';
-    var btnFix = document.getElementById("BtnFixReset");
-    if (btnFix) btnFix.style.display = "none";
     var pad = document.getElementById("camPad");
     if (pad) pad.style.display = "none";
+    document.getElementById("camIndicator").style.bottom = "10px";
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
@@ -443,6 +440,12 @@ function resetPos() {
     applyPosFix();
     drawnPos = null;
     camUpdate();
+}
+
+// 패드 중앙 버튼: 방위 보정(headingFix) + 위치 보정(posFix) 모두 초기화
+function resetAll() {
+    resetFix();
+    resetPos();
 }
 
 function resetFix() {
