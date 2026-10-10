@@ -72,6 +72,7 @@ function applySite(key) {
     MCR_all = d.MCR;
     HDH_all = d.HDH;
     ETC_all = d.ETC;
+    clearSelect();// 다른 지사 설비 하이라이트 남지 않게 (ai_click.js)
     mapUpdate();
 }
 

@@ -1,8 +1,11 @@
 // 지도 클릭 → 클릭 지점에서 가장 가까운 설비 1개(맨홀·핸드홀·기계실·기타·배관)의 정보 모달.
 // 오버레이별 onclick은 없앰. 오버레이는 pointer-events:none이라 클릭이 지도로 감 (index.html .overlay1)
 var CLICK_MAX_M = 10;// 이 거리(m) 안에 있는 설비만 후보
+var selOverlay = null;// 선택 하이라이트 (배관=Polyline, 점=CustomOverlay 링). 다음 클릭·지사 전환 때 제거
+var SEL_COLOR = '#1E88E5';// 하이라이트 파랑
 
 function mapClick(latLng) {
+    clearSelect();// 빈 곳 클릭 = 선택 해제
     var lat = latLng.getLat(), lng = latLng.getLng();
     var bestPt = null, bestPipe = null;// 점 설비 / 배관 각각의 최단 {dist, type, item}
 
@@ -36,8 +39,41 @@ function mapClick(latLng) {
     // 배관은 맨홀·핸드홀을 지나가므로 점 설비 근처에선 배관이 늘 더 가까움 → 범위 안에 점 설비가 있으면 점 설비 우선, 없을 때만 배관
     var best = bestPt || bestPipe;
     if (!best) return;
+    highlight(best.type, best.item);
     var info = infoOf(best.type, best.item);
     openMcrModal(info.title, info.body);
+}
+
+// 선택 하이라이트 제거
+function clearSelect() {
+    if (selOverlay) {
+        selOverlay.setMap(null);
+        selOverlay = null;
+    }
+}
+
+// 선택한 설비를 파랑으로 표시. 배관은 경로 위에 굵은 선, 점 설비는 아이콘 둘레에 링 (px 고정이라 줌과 무관)
+function highlight(type, item) {
+    clearSelect();
+    if (type === "PPG") {
+        selOverlay = new kakao.maps.Polyline({
+            path: item.coords,
+            strokeWeight: 6,
+            strokeColor: SEL_COLOR,
+            strokeOpacity: 0.8,
+            strokeStyle: 'solid',
+            zIndex: 5
+        });
+    } else {
+        selOverlay = new kakao.maps.CustomOverlay({
+            position: item.position,
+            content: '<div style="width:30px; height:30px; border:3px solid ' + SEL_COLOR + '; border-radius:50%; box-shadow:0 0 6px ' + SEL_COLOR + '; box-sizing:border-box; pointer-events:none;"></div>',
+            xAnchor: 0.5,
+            yAnchor: 0.5,
+            zIndex: 5
+        });
+    }
+    selOverlay.setMap(map);
 }
 
 // 설비 종류별 모달 제목/내용
