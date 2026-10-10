@@ -118,7 +118,6 @@ function mapMH() {
     }
     mapHM_Over = [];
 
-    if (!showLayer.MH) return;// 설정에서 숨김 (index.html showLayer)
     if (map.getLevel() > 3) return;
 
     MH_all.forEach(function(mh) {
@@ -126,11 +125,27 @@ function mapMH() {
 
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
+        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/mh.png" alt="맨홀">
             <span class="label1">${mh.name}</span>
         `;
+
+        contentDiv.onclick = function(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+
+            var titleText = `${mh.name || '-'}`;
+            var bodyContent = `
+                <b>규격(가로x세로x높이):</b> ${mh.lt || '-'} x ${mh.bt || '-'} x ${mh.hg || '-'} m<br>
+                <b>출입구 깊이:</b> ${mh.dp || '-'} m<br>
+                <b>상태등급:</b> ${mh.grade || '-'} 등급<br>
+                <b>위치설명:</b> ${mh.lc || '-'}<br>
+                <b>설치일자:</b> ${mh.date || '-'}<br>
+            `;
+
+            openMcrModal(titleText, bodyContent);
+        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: mh.position,
@@ -184,7 +199,6 @@ function roadMH() {
     }
     roadHM_Over = [];
 
-    if (!showLayer.MH) return;// 설정에서 숨김 (index.html showLayer)
     MH_roadOn.forEach(function(mh) {
         var dist = getDistanceMeter(currentLat, currentLng, mh.position.getLat(), mh.position.getLng());
 
@@ -211,7 +225,6 @@ function roadMH() {
 
 function camMH() {
     if (!cmaPos || !camRot || !camSVG) return;
-    if (!showLayer.MH) return;// 설정에서 숨김 (index.html showLayer)
 
     var currentLat = cmaPos.lat;
     var currentLng = cmaPos.lng;
@@ -265,7 +278,7 @@ function camMH() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 10);// 아이콘 높이 절반(20/2) → 아이콘 중심이 투영점 위에
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -358,7 +371,6 @@ function mapHDH() {
 
     mapHDH_Over = [];
 
-    if (!showLayer.HDH) return;// 설정에서 숨김 (index.html showLayer)
     if (map.getLevel() > 3) return;
 
     HDH_all.forEach(function(HDH) {
@@ -367,11 +379,26 @@ function mapHDH() {
         var iconPath = getHDHIcon(HDH.srCode);
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
+        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="${iconPath}" alt="핸드홀">
             <span class="label1">${HDH.name}(${HDH.srCode})</span>
         `;
+
+        contentDiv.onclick = function(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+
+            var titleText = `${HDH.name}(${HDH.srCode})`;
+            var bodyContent = `
+                <b>밸브위치:</b> ${HDH.lc || '-'}<br>
+                <b>깊이:</b> ${HDH.dp || '-'} m<br>
+                <b>설치일:</b> ${HDH.date || '-'}<br>
+                <b>등급:</b> ${HDH.grade || '-'}<br>
+            `;
+
+            openMcrModal(titleText, bodyContent);
+        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: HDH.position,
@@ -425,7 +452,6 @@ function roadHDH() {
     }
     roadHDH_Over = [];
 
-    if (!showLayer.HDH) return;// 설정에서 숨김 (index.html showLayer)
     HDH_roadOn.forEach(function(HDH) {
         var dist = getDistanceMeter(currentLat, currentLng, HDH.position.getLat(), HDH.position.getLng());
         
@@ -453,7 +479,6 @@ function roadHDH() {
 
 function camHDH() {
     if (!cmaPos || !camRot || !camSVG) return;
-    if (!showLayer.HDH) return;// 설정에서 숨김 (index.html showLayer)
 
     var currentLat = cmaPos.lat;
     var currentLng = cmaPos.lng;
@@ -507,7 +532,7 @@ function camHDH() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 8);// 아이콘 높이 절반(16/2) → 아이콘 중심이 투영점 위에
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -591,7 +616,6 @@ function mapMCR() {
     }
     mapMCR_Over = [];
 
-    if (!showLayer.MCR) return;// 설정에서 숨김 (index.html showLayer)
     if (map.getLevel() > 3) return;
     var mapBounds = map.getBounds();
 
@@ -600,11 +624,28 @@ function mapMCR() {
 
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
+        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/MCR.png" alt="기계실">
             <span class="label1">${MCR.buildName}(${MCR.roomName})</span>
         `;
+
+        contentDiv.onclick = function(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+
+            var titleText = `${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})`;
+            var bodyContent = `
+                <b>차단밸브 관경:</b> ${MCR.dia || '-'} A<br>
+                <b>열부하:</b> ${MCR.heat || '-'} Mcal/h<br>
+                <b>세대수:</b> ${MCR.house || '-'} 세대<br>
+                <b>기계실 위치:</b> ${MCR.roomLc || '-'}<br>
+                <b>밸브 위치:</b> ${MCR.valveLc || '-'}<br>
+                <b>밸브 형태:</b> ${MCR.valveKey || '-'}<br>
+            `;
+
+            openMcrModal(titleText, bodyContent);
+        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: MCR.position,
@@ -658,7 +699,6 @@ function roadMCR() {
     }
     roadMCR_Over = [];
 
-    if (!showLayer.MCR) return;// 설정에서 숨김 (index.html showLayer)
     MCR_roadOn.forEach(function(MCR) {
         var dist = getDistanceMeter(currentLat, currentLng, MCR.position.getLat(), MCR.position.getLng());
 
@@ -685,7 +725,6 @@ function roadMCR() {
 
 function camMCR() {
     if (!cmaPos || !camRot || !camSVG) return;
-    if (!showLayer.MCR) return;// 설정에서 숨김 (index.html showLayer)
 
     var currentLat = cmaPos.lat;
     var currentLng = cmaPos.lng;
@@ -737,7 +776,7 @@ function camMCR() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 10);// 아이콘 높이 절반(20/2) → 아이콘 중심이 투영점 위에
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -832,11 +871,23 @@ function mapETC() {
         var iconPath = getETCIcon(ETC.TYPE);
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
+        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="${iconPath}" alt="기타">
             <span class="label1">${ETC.NAME}</span>
         `;
+
+        contentDiv.onclick = function(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+
+            var titleText = `${ETC.NAME}`;
+            var bodyContent = `
+                <b>특성:</b> ${ETC.ETC1 || '-'}<br>
+            `;
+
+            openMcrModal(titleText, bodyContent);
+        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: ETC.position,
@@ -907,7 +958,7 @@ function camETC() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 10);// 아이콘 높이 절반(20/2) → 아이콘 중심이 투영점 위에
+        foreignObj.setAttribute("y", p.y - 12);
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;

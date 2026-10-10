@@ -14,17 +14,6 @@ var PPG_roadOn = [];
 var PPG_camCachePos = null;
 var PPG_camOn = [];
 
-var showGrade = false;// 설정 모달 '등급별 색 표시'. 기본 해제 = S/R 색
-var GRADE_COLORS = {A: '#00C853', B: '#FFD600', C: '#FF3D00', D: '#D50000', E: '#6A1B9A'};// 등급별 선 색 (데이터엔 A/B/C). 없는 등급은 회색
-
-// 배관 선 색. 기본 S=빨강, R=주황, 그 외 회색. 등급 표시 켜면 qltyGrade 기준 (지도·로드뷰·카메라 공통)
-function pipeColor(PPG) {
-    if (showGrade) return GRADE_COLORS[PPG.qltyGrade] || '#888888';
-    if (PPG.srCode === 'S') return '#FF0000';
-    if (PPG.srCode === 'R') return '#FFA000';
-    return '#888888';
-}
-
 
 function loadPPG(filePath) {
     fetch(filePath)
@@ -47,15 +36,6 @@ function parsePPG(csvText) {
     var lines = csvText.trim().split('\n');
     if (lines.length <= 1) return;
 
-    // 따옴표 수가 홀수인 줄 = 따옴표 안에서 줄바꿈된 행. 다음 줄과 합침 (PPG.csv에 LINE_NM 줄바꿈 1건)
-    for (var k = 0; k < lines.length - 1; k++) {
-        if ((lines[k].match(/"/g) || []).length % 2 === 1) {
-            lines[k] += lines[k + 1];
-            lines.splice(k + 1, 1);
-            k--;
-        }
-    }
-
     for (var i = 1; i < lines.length; i++) {
         var line = lines[i].trim();
         if (!line) continue;
@@ -66,7 +46,7 @@ function parsePPG(csvText) {
         if (coordStartIndex === -1 || coordEndIndex === -1) continue;
 
         var propertiesPart = line.substring(0, coordStartIndex);
-        var columns = parseCSVLine(propertiesPart);// point.js. 따옴표 안 콤마 처리 (LINE_NM에 콤마 있는 행). 끝의 빈 칸은 무시됨
+        var columns = propertiesPart.split(',');
 
         var eqpId = columns[0] ? columns[0].trim() : '';
         var srCode = columns[1] ? columns[1].trim() : '';
@@ -136,34 +116,81 @@ function mapPPG(){
     if (!map || PPG_all.length === 0) return;
     if (map.getLevel() >= 5) return;
 
-    PPG_all.forEach(function(PPG) {
-        if (!mapBounds.intersects(PPG.bounds)) return;
+    for (var i = 0; i < PPG_all.length; i++) {
+        var PPG = PPG_all[i];
 
-        var lineColor = pipeColor(PPG);
+        if (mapBounds.intersects(PPG.bounds)) {
+            var lineColor = '#FF0000';
+            if (PPG.srCode === 'R') lineColor = '#FFA000';
+            else if (PPG.srCode !== 'S') lineColor = '#888888';
 
-        var poly = new kakao.maps.Polyline({
-            path: PPG.coords,
-            strokeWeight: 1,
-            strokeColor: lineColor,
-            strokeStyle: 'solid'
-        });
+            var poly = new kakao.maps.Polyline({
+                path: PPG.coords,
+                strokeWeight: 1,
+                strokeColor: lineColor,
+                strokeStyle: 'solid'
+            });
 
-        poly.setMap(map);
-        mapPPG_poly.push(poly);
-        PPG_on.push(PPG);
-    });
+            kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
+                var titleText = `${PPG.LINE_NM} (${PPG.srCode || '-'})`;
+                var bodyContent = `
+                    <b>설비ID:</b> ${PPG.eqpId || '-'}<br>
+                    <b>관경:</b> ${PPG.diaCode || '-'} mm<br>
+                    <b>설치일자:</b> ${PPG.competDe || '-'}<br>
+                    <b>상태:</b> ${PPG.qltyGrade || '-'}<br>
+                    <b>평균깊이:</b> ${PPG.avgDph || '-'} m
+                `;
+                
+                openMcrModal(titleText, bodyContent);
+            });
+
+            poly.setMap(map);
+            mapPPG_poly.push(poly);
+            PPG_on.push(PPG);
+        }
+    }
 
     if (map.getLevel() >= 3) return;
     if (PPG_on.length === 0) return;
 
-    groupConnected(PPG_on).forEach(function(group) {
-        var ttPPG = group.reduce(function(max, curr) {
-            var maxLen = parseFloat(max.plineLt) || 0;
-            var currLen = parseFloat(curr.plineLt) || 0;
-            return currLen > maxLen ? curr : max;
-        }, group[0]);
+    var visited = new Array(PPG_on.length).fill(false);
+    var idx_groups = [];
+    
+    for (var i = 0; i < PPG_on.length; i++) {
+        if (visited[i]) continue;
 
+        var group = [];
+        var queue = [i];
+        visited[i] = true;
+
+        while (queue.length > 0) {
+            var curr = queue.shift();
+            group.push(curr);
+
+            for (var j = 0; j < PPG_on.length; j++) {
+                if (visited[j]) continue;
+
+                if (isConnected(PPG_on[curr], PPG_on[j])) {
+                    visited[j] = true;
+                    queue.push(j);
+                }
+            }
+        }
+        idx_groups.push(group);
+    }
+
+    for (var g = 0; g < idx_groups.length; g++) {
+        var groupIndices = idx_groups[g];
+
+        var ttIndex = groupIndices.reduce(function(maxIdx, currIdx) {
+            var maxLen = parseFloat(PPG_on[maxIdx].plineLt) || 0;
+            var currLen = parseFloat(PPG_on[currIdx].plineLt) || 0;
+            return currLen > maxLen ? currIdx : maxIdx;
+        }, groupIndices[0]);
+
+        var ttPPG = PPG_on[ttIndex];
         var midCoordIndex = Math.floor((ttPPG.coords.length - 1) / 2);
+
         var p1 = ttPPG.coords[midCoordIndex];
         var p2 = ttPPG.coords[midCoordIndex + 1] || p1;
 
@@ -193,7 +220,7 @@ function mapPPG(){
             overlay.setMap(map);
             mapPPG_label.push(overlay);
         }
-    });
+    }
 }
 
 // ★ 캐시 방식 적용된 roadPPG
@@ -266,7 +293,9 @@ function roadPPG(){
             var element1 = make_roadPPG_over(pos1, id0, id1, PPG);
             var element2 = make_roadPPG_over(pos2, id0, id1+1, PPG);
 
-            var color = pipeColor(PPG);
+            var color = '#888888';
+            if (PPG.srCode === 'S') color = '#FF0000';
+            if (PPG.srCode === 'R') color = '#FFA000';
 
             road_pipe.push({
                 id0: id0,
@@ -358,7 +387,33 @@ function roadPPG(){
 
     if (visiblePPGs.length === 0) return;
 
-    groupConnected(visiblePPGs).forEach(function(group) {
+    var visited = new Array(visiblePPGs.length).fill(false);
+    var groups = [];
+
+    for (var i = 0; i < visiblePPGs.length; i++) {
+        if (visited[i]) continue;
+
+        var group = [];
+        var queue = [i];
+        visited[i] = true;
+
+        while (queue.length > 0) {
+            var curr = queue.shift();
+            group.push(visiblePPGs[curr]);
+
+            for (var j = 0; j < visiblePPGs.length; j++) {
+                if (visited[j]) continue;
+
+                if (isConnected(visiblePPGs[curr], visiblePPGs[j])) {
+                    visited[j] = true;
+                    queue.push(j);
+                }
+            }
+        }
+        groups.push(group);
+    }
+
+    groups.forEach(function(group) {
         var ttPPG = group.reduce(function(max, curr) {
             var maxLen = parseFloat(max.plineLt) || 0;
             var currLen = parseFloat(curr.plineLt) || 0;
@@ -406,19 +461,15 @@ function roadPPG(){
     });
 }
 
-// ★ road_pipe 방식 camPPG: cam_pipe 배열에 세그먼트 정보를 모은 뒤 투영·그리기·라벨을 배열 기준으로 처리
-var cam_pipe = [];
-var CAM_NEAR = 0.3;// 카메라 앞 이 거리(m)보다 가까운 부분은 잘라냄. 뒤쪽 점은 투영이 뒤집히므로 선을 여기서 자름
-
+// ★ 캐시 방식 적용된 camPPG
 function camPPG() {
-    cam_pipe = [];
     if (!cmaPos || !camRot || !camSVG) return;
-    // camSVG 비우기는 drawCam이 함. 여기서 비우면 drawCam이 먼저 그린 십자선이 지워짐
+    camSVG.innerHTML = '';
 
     var currentLat = cmaPos.lat;
     var currentLng = cmaPos.lng;
 
-    // 1. 30m 이동 여부 확인 및 60m 캐시 바운딩 영역 생성 (roadPPG와 동일)
+    // 1. 30m 이동 여부 확인 및 60m 캐시 바운딩 영역 생성
     var needRecache = true;
     if (PPG_camCachePos) {
         var movedDist = getDistanceMeter(PPG_camCachePos.lat, PPG_camCachePos.lng, currentLat, currentLng);
@@ -446,78 +497,131 @@ function camPPG() {
         });
     }
 
-    // 2. cam_pipe 생성: 내 위치에서 세그먼트까지 최단거리가 camDistance 이내인 것만 (roadPPG와 같은 기준)
+    // 2. 전체 배관(PPG_all) 대신 60m 캐시 리스트(PPG_camOn)만 2D 투영 및 세그먼트 생성
+    PPG_camOn.forEach(function(item) {
+        var PPG = item.ppg;
+        if (!PPG.coords || PPG.coords.length < 2) return;
+
+        var color = '#888888';
+        if (PPG.srCode === 'S') color = '#FF0000';
+        else if (PPG.srCode === 'R') color = '#FFA000';
+
+        for (var i = 0; i < PPG.coords.length - 1; i++) {
+            var pos1 = PPG.coords[i];
+            var pos2 = PPG.coords[i + 1];
+
+            var east1 = (pos1.getLng() - currentLng) * 111320 * cosLat;
+            var north1 = (pos1.getLat() - currentLat) * 111320;
+            var dist1 = Math.hypot(east1, north1);
+
+            var east2 = (pos2.getLng() - currentLng) * 111320 * cosLat;
+            var north2 = (pos2.getLat() - currentLat) * 111320;
+            var dist2 = Math.hypot(east2, north2);
+
+            if (dist1 > camDistance && dist2 > camDistance) continue;
+
+            var p1 = camProject(camRot, east1, north1, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+            var p2 = camProject(camRot, east2, north2, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
+
+            if (!p1) return;
+            var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p1.x.toFixed(1));
+            circle.setAttribute("cy", p1.y.toFixed(1));
+            circle.setAttribute("r", "5");
+            circle.setAttribute("fill", color);
+            camSVG.appendChild(circle);
+
+            if (!p2) return;
+            var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p2.x.toFixed(1));
+            circle.setAttribute("cy", p2.y.toFixed(1));
+            circle.setAttribute("r", "5");
+            circle.setAttribute("fill", color);
+            camSVG.appendChild(circle);
+
+            function isCamScreenInner(x, y) {
+                var margin = 1;
+                return (x >= -margin && x <= camWt + margin && y >= -margin && y <= camHt + margin);
+            }
+
+            var inner1 = p1 && isCamScreenInner(p1.x, p1.y);
+            var inner2 = p2 && isCamScreenInner(p2.x, p2.y);
+
+            if (inner1 && inner2) {
+                lineDraw(p1.x, p1.y, p2.x, p2.y, color, camSVG);
+            }
+            else if (inner1 && p2) {
+                var dx = p2.x - p1.x;
+                var dy = p2.y - p1.y;
+                var end = extendToRectEdge(p1.x, p1.y, dx, dy, camWt, camHt);
+                lineDraw(p1.x, p1.y, end.x, end.y, color, camSVG);
+            }
+            else if (inner2 && p1) {
+                var dx = p1.x - p2.x;
+                var dy = p1.y - p2.y;
+                var end = extendToRectEdge(p2.x, p2.y, dx, dy, camWt, camHt);
+                lineDraw(p2.x, p2.y, end.x, end.y, color, camSVG);
+            }
+            else if (p1 && p2) {
+                var end1 = extendToRectEdge(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y, camWt, camHt);
+                var end2 = extendToRectEdge(p2.x, p2.y, p1.x - p2.x, p1.y - p2.y, camWt, camHt);
+                if (end1 && end2) {
+                    lineDraw(end1.x, end1.y, end2.x, end2.y, color, camSVG);
+                }
+            }
+        }
+    });
+
+    var visiblePPGs = [];
+    var visiblePPGIds = new Set();
+
     PPG_camOn.forEach(function(item) {
         var PPG = item.ppg;
         var id0 = item.originalId;
 
         if (!PPG.coords || PPG.coords.length < 2) return;
 
-        var color = pipeColor(PPG);
+        var isNear = PPG.coords.some(function(pos) {
+            var east = (pos.getLng() - currentLng) * 111320 * cosLat;
+            var north = (pos.getLat() - currentLat) * 111320;
+            return Math.hypot(east, north) <= camDistance;
+        });
 
-        for (var id1 = 0; id1 < PPG.coords.length - 1; id1++) {
-            var pos1 = PPG.coords[id1];
-            var pos2 = PPG.coords[id1 + 1];
-
-            var closestPt = getClosestPointOnLine(
-                currentLat, currentLng,
-                pos1.getLat(), pos1.getLng(),
-                pos2.getLat(), pos2.getLng()
-            );
-
-            var distance = getDistanceMeter(currentLat, currentLng, closestPt.lat, closestPt.lng);
-            if (distance > camDistance) continue;
-
-            cam_pipe.push({
-                id0: id0,
-                pos1: pos1,
-                pos2: pos2,
-                cam1: camSpaceOf(pos1),// 카메라 좌표 {dx:오른쪽, dy:위, fwd:앞} (m)
-                cam2: camSpaceOf(pos2),
-                inner1: false,
-                inner2: false,
-                visible: false,
-                x1: 0, y1: 0, x2: 0, y2: 0,
-                color: color
-            });
-        }
-    });
-
-    // 3. 투영 + 그리기. 뒤쪽 끝점은 CAM_NEAR 면에서 잘라 투영. 화면 밖 좌표는 SVG가 알아서 잘라 보여주므로 별도 처리 없음
-    cam_pipe.forEach(function(pipe) {
-        var a = pipe.cam1;
-        var b = pipe.cam2;
-        if (a.fwd < CAM_NEAR && b.fwd < CAM_NEAR) return;// 둘 다 카메라 뒤
-        if (a.fwd < CAM_NEAR) a = clipNear(a, b);
-        if (b.fwd < CAM_NEAR) b = clipNear(b, a);
-
-        var p1 = camPx(a);
-        var p2 = camPx(b);
-        pipe.x1 = p1.x; pipe.y1 = p1.y;
-        pipe.x2 = p2.x; pipe.y2 = p2.y;
-        pipe.inner1 = pipe.cam1.fwd >= CAM_NEAR && camInner(p1.x, p1.y);// 잘린 끝점은 inner 아님
-        pipe.inner2 = pipe.cam2.fwd >= CAM_NEAR && camInner(p2.x, p2.y);
-        pipe.visible = pipe.inner1 || pipe.inner2 || camInner((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-
-        lineDraw(pipe.x1, pipe.y1, pipe.x2, pipe.y2, pipe.color, camSVG);
-        if (pipe.inner1) camDot(pipe.x1, pipe.y1, pipe.color);
-        if (pipe.inner2) camDot(pipe.x2, pipe.y2, pipe.color);
-    });
-
-    // 4. 라벨: 화면에 보이는 세그먼트가 있는 배관만 → 연결 그룹 → 그룹 내 최장 배관 중간에 1개
-    var visiblePPGs = [];
-    var visiblePPGIds = new Set();
-
-    cam_pipe.forEach(function(pipe) {
-        if (pipe.visible && !visiblePPGIds.has(pipe.id0)) {
-            visiblePPGIds.add(pipe.id0);
-            visiblePPGs.push(PPG_all[pipe.id0]);
+        if (isNear && !visiblePPGIds.has(id0)) {
+            visiblePPGIds.add(id0);
+            visiblePPGs.push(PPG);
         }
     });
 
     if (visiblePPGs.length === 0) return;
 
-    groupConnected(visiblePPGs).forEach(function(group) {
+    var visited = new Array(visiblePPGs.length).fill(false);
+    var groups = [];
+
+    for (var i = 0; i < visiblePPGs.length; i++) {
+        if (visited[i]) continue;
+
+        var group = [];
+        var queue = [i];
+        visited[i] = true;
+
+        while (queue.length > 0) {
+            var curr = queue.shift();
+            group.push(visiblePPGs[curr]);
+
+            for (var j = 0; j < visiblePPGs.length; j++) {
+                if (visited[j]) continue;
+
+                if (isConnected(visiblePPGs[curr], visiblePPGs[j])) {
+                    visited[j] = true;
+                    queue.push(j);
+                }
+            }
+        }
+        groups.push(group);
+    }
+
+    groups.forEach(function(group) {
         var ttPPG = group.reduce(function(max, curr) {
             var maxLen = parseFloat(max.plineLt) || 0;
             var currLen = parseFloat(curr.plineLt) || 0;
@@ -528,107 +632,35 @@ function camPPG() {
         var p1 = ttPPG.coords[midIdx];
         var p2 = ttPPG.coords[midIdx + 1] || p1;
 
-        var centerPos = (ttPPG.srCode === 'S')
-            ? getPointAtRatio(p1, p2, 0.1)
+        var centerPos = (ttPPG.srCode === 'S') 
+            ? getPointAtRatio(p1, p2, 0.1) 
             : getPointAtRatio(p1, p2, 0.9);
 
-        var c = camSpaceOf(centerPos);
-        if (c.fwd < CAM_NEAR) return;
-        var p = camPx(c);
-        if (!camInner(p.x, p.y)) return;
+        var east = (centerPos.getLng() - currentLng) * 111320 * cosLat;
+        var north = (centerPos.getLat() - currentLat) * 111320;
+        
+        var p = camProject(camRot, east, north, -CAMERA_HEIGHT, camWt, camHt, f, screenAngle);
 
-        var labelClass = (ttPPG.srCode === 'S') ? 'road-s-pipe' : 'road-r-pipe';// 로드뷰 라벨과 같은 스타일(색·굵기·검정 외곽선)
+        if (!p || p.x < 0 || p.x > camWt || p.y < 0 || p.y > camHt) return;
 
-        var foreignObj = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-        foreignObj.setAttribute('x', (p.x - 60).toFixed(1));// 너비 절반만큼 왼쪽 (중앙 정렬)
-        foreignObj.setAttribute('y', (p.y - 20).toFixed(1));// 높이 절반만큼 위
-        foreignObj.setAttribute('width', '120');
-        foreignObj.setAttribute('height', '40');
-        foreignObj.innerHTML = `
-            <div class="${labelClass}" style="text-align: center; white-space: nowrap;">
-                ${ttPPG.diaCode}A<br>(${ttPPG.LINE_NM})
-            </div>
-        `;
+        var labelText = ttPPG.eqpId + ' (' + ttPPG.diaCode + 'A)';
+        var labelClass = (ttPPG.srCode === 'S') ? 'cam-s-pipe' : 'cam-r-pipe';
+        var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
+        var bgColor = '#000000';
 
-        camSVG.appendChild(foreignObj);
+        var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textNode.setAttribute('x', p.x.toFixed(1));
+        textNode.setAttribute('y', p.y.toFixed(1));
+        textNode.setAttribute('fill', labelColor);
+        textNode.setAttribute('stroke', bgColor);
+        textNode.setAttribute('paint-order', 'stroke fill');
+        textNode.setAttribute('class', labelClass);
+        textNode.setAttribute('text-anchor', 'middle');
+        textNode.setAttribute('dominant-baseline', 'middle');
+        textNode.textContent = labelText;
+
+        camSVG.appendChild(textNode);
     });
-}
-
-// 위경도 → 카메라 좌표 {dx:오른쪽, dy:위, fwd:앞} (m). test7.js camProject의 1단계와 같은 계산 (camRot, cosLat, cmaPos 전역 사용)
-// 선분은 양 끝을 따로 투영하면 한쪽이 카메라 뒤일 때 뒤집히므로, 카메라 좌표에서 먼저 자르려고 중간 단계를 분리
-function camSpaceOf(pos) {
-    var east = (pos.getLng() - cmaPos.lng) * 111320 * cosLat;// 내 위치 기준 동쪽 m
-    var north = (pos.getLat() - cmaPos.lat) * 111320;// 북쪽 m
-    var up = -CAMERA_HEIGHT;// 배관은 지면(또는 그 아래)이라 카메라보다 CAMERA_HEIGHT 아래
-    var R = camRot;
-    return {
-        dx: R[0] * east + R[3] * north + R[6] * up,// 카메라 기준 오른쪽 m
-        dy: R[1] * east + R[4] * north + R[7] * up,// 위 m
-        fwd: -(R[2] * east + R[5] * north + R[8] * up)// 앞 m (음수 = 카메라 뒤)
-    };
-}
-
-// 카메라 좌표 → 화면 px. fwd > 0 전제 (camProject 2·3단계와 같은 계산, 화면 밖이어도 값 돌려줌. SVG가 알아서 잘라 보여줌)
-function camPx(c) {
-    var cs = Math.cos(screenAngle * RAD), sn = Math.sin(screenAngle * RAD);// 가로모드 회전
-    return {
-        x: camWt / 2 + f * (cs * c.dx - sn * c.dy) / c.fwd,// 핀홀: px = f · 옆/앞
-        y: camHt / 2 - f * (sn * c.dx + cs * c.dy) / c.fwd// 화면 y는 아래가 +라 부호 반전
-    };
-}
-
-// 뒤쪽 점 a를 a-b 선분 위에서 fwd = CAM_NEAR 지점으로 이동 (카메라 좌표는 직선이라 선형 보간)
-function clipNear(a, b) {
-    var t = (CAM_NEAR - a.fwd) / (b.fwd - a.fwd);// a에서 b로 가는 비율 중 fwd가 CAM_NEAR가 되는 지점 (0~1)
-    return {
-        dx: a.dx + (b.dx - a.dx) * t,
-        dy: a.dy + (b.dy - a.dy) * t,
-        fwd: CAM_NEAR
-    };
-}
-
-function camInner(x, y) {
-    var margin = 1;
-    return (x >= -margin && x <= camWt + margin && y >= -margin && y <= camHt + margin);
-}
-
-function camDot(x, y, color) {
-    var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    circle.setAttribute("cx", x.toFixed(1));
-    circle.setAttribute("cy", y.toFixed(1));
-    circle.setAttribute("r", "5");
-    circle.setAttribute("fill", color);
-    camSVG.appendChild(circle);
-}
-
-// 끝점이 맞닿은(isConnected) 배관끼리 묶기. mapPPG·roadPPG의 BFS와 같은 로직
-function groupConnected(list) {
-    var visited = new Array(list.length).fill(false);
-    var groups = [];
-
-    for (var i = 0; i < list.length; i++) {
-        if (visited[i]) continue;
-
-        var group = [];
-        var queue = [i];
-        visited[i] = true;
-
-        while (queue.length > 0) {
-            var curr = queue.shift();
-            group.push(list[curr]);
-
-            for (var j = 0; j < list.length; j++) {
-                if (visited[j]) continue;
-
-                if (isConnected(list[curr], list[j])) {
-                    visited[j] = true;
-                    queue.push(j);
-                }
-            }
-        }
-        groups.push(group);
-    }
-    return groups;
 }
 
 function isConnected(PPG1, PPG2) {

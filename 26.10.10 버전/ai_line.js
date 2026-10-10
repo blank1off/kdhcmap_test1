@@ -14,17 +14,6 @@ var PPG_roadOn = [];
 var PPG_camCachePos = null;
 var PPG_camOn = [];
 
-var showGrade = false;// 설정 모달 '등급별 색 표시'. 기본 해제 = S/R 색
-var GRADE_COLORS = {A: '#00C853', B: '#FFD600', C: '#FF3D00', D: '#D50000', E: '#6A1B9A'};// 등급별 선 색 (데이터엔 A/B/C). 없는 등급은 회색
-
-// 배관 선 색. 기본 S=빨강, R=주황, 그 외 회색. 등급 표시 켜면 qltyGrade 기준 (지도·로드뷰·카메라 공통)
-function pipeColor(PPG) {
-    if (showGrade) return GRADE_COLORS[PPG.qltyGrade] || '#888888';
-    if (PPG.srCode === 'S') return '#FF0000';
-    if (PPG.srCode === 'R') return '#FFA000';
-    return '#888888';
-}
-
 
 function loadPPG(filePath) {
     fetch(filePath)
@@ -139,13 +128,29 @@ function mapPPG(){
     PPG_all.forEach(function(PPG) {
         if (!mapBounds.intersects(PPG.bounds)) return;
 
-        var lineColor = pipeColor(PPG);
+        var lineColor = '#FF0000';
+        if (PPG.srCode === 'R') lineColor = '#FFA000';
+        else if (PPG.srCode !== 'S') lineColor = '#888888';
 
         var poly = new kakao.maps.Polyline({
             path: PPG.coords,
             strokeWeight: 1,
             strokeColor: lineColor,
             strokeStyle: 'solid'
+        });
+
+        // forEach 콜백 안이라 폴리라인마다 PPG가 따로 잡힘 (for + var였을 땐 모든 클릭이 마지막 PPG를 가리킴)
+        kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
+            var titleText = `${PPG.LINE_NM} (${PPG.srCode || '-'})`;
+            var bodyContent = `
+                <b>설비ID:</b> ${PPG.eqpId || '-'}<br>
+                <b>관경:</b> ${PPG.diaCode || '-'} mm<br>
+                <b>설치일자:</b> ${PPG.competDe || '-'}<br>
+                <b>상태:</b> ${PPG.qltyGrade || '-'}<br>
+                <b>평균깊이:</b> ${PPG.avgDph || '-'} m
+            `;
+
+            openMcrModal(titleText, bodyContent);
         });
 
         poly.setMap(map);
@@ -266,7 +271,9 @@ function roadPPG(){
             var element1 = make_roadPPG_over(pos1, id0, id1, PPG);
             var element2 = make_roadPPG_over(pos2, id0, id1+1, PPG);
 
-            var color = pipeColor(PPG);
+            var color = '#888888';
+            if (PPG.srCode === 'S') color = '#FF0000';
+            if (PPG.srCode === 'R') color = '#FFA000';
 
             road_pipe.push({
                 id0: id0,
@@ -453,7 +460,9 @@ function camPPG() {
 
         if (!PPG.coords || PPG.coords.length < 2) return;
 
-        var color = pipeColor(PPG);
+        var color = '#888888';
+        if (PPG.srCode === 'S') color = '#FF0000';
+        if (PPG.srCode === 'R') color = '#FFA000';
 
         for (var id1 = 0; id1 < PPG.coords.length - 1; id1++) {
             var pos1 = PPG.coords[id1];

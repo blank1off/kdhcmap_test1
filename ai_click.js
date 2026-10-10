@@ -17,9 +17,9 @@ function mapClick(latLng) {
 
     // 점 설비는 지도 레벨 3 이하에서만 그려지므로 그때만 후보 (안 보이는 걸 클릭할 순 없음)
     if (map.getLevel() <= 3) {
-        MH_all.forEach(function(mh) { consider(pointDist(mh.position), "MH", mh); });
-        HDH_all.forEach(function(h) { consider(pointDist(h.position), "HDH", h); });
-        MCR_all.forEach(function(m) { consider(pointDist(m.position), "MCR", m); });
+        if (showLayer.MH) MH_all.forEach(function(mh) { consider(pointDist(mh.position), "MH", mh); });// 숨긴 종류는 제외
+        if (showLayer.HDH) HDH_all.forEach(function(h) { consider(pointDist(h.position), "HDH", h); });
+        if (showLayer.MCR) MCR_all.forEach(function(m) { consider(pointDist(m.position), "MCR", m); });
         ETC_all.forEach(function(e) { consider(pointDist(e.position), "ETC", e); });
     }
 
