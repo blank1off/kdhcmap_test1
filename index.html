@@ -108,8 +108,7 @@
             align-items: center;
             pointer-events: auto; /* 클릭 이벤트를 받으려면 auto, 지도 클릭을 방해하지 않으려면 none */
         }
-        .icon1 {/* 맨홀 아이콘 이미지 */
-            width: 24px; height: 24px;
+        .icon1 {/* 아이콘 이미지. 크기 지정 안 함 = PNG 원본 크기 (맨홀·기계실·기타 20px, 핸드홀 16px). 바꾸면 point.js cam*의 y 오프셋도 맞출 것 */
         }
         .label1 {/* 맨홀 이름 라벨 */
             background: rgba(0, 0, 0, 0.7);
@@ -204,7 +203,7 @@
             <div>HEAD  : <span id="indHeading">-</span></div>
         </div>
         <div id ="ui">
-            <select id="siteSel" class="icon-btn" style="width:auto; height:40px; padding:0 10px; border-radius:20px; font-size:13px; font-weight:bold;" onchange="selectSite(this.value)" title="지사 선택"></select>
+            <select id="siteSel" class="icon-btn" style="width:auto; height:40px; padding:0 10px; border-radius:20px; font-size:13px; font-weight:bold;" onchange="selectSite(this.value, true)" title="지사 선택"></select>
             <button id="BtnSearch" onclick="openSearchModal()" title="검색" class="icon-btn">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="7"></circle>

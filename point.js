@@ -278,7 +278,7 @@ function camMH() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 12);
+        foreignObj.setAttribute("y", p.y - 10);// 아이콘 높이 절반(20/2) → 아이콘 중심이 투영점 위에
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -532,7 +532,7 @@ function camHDH() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 12);
+        foreignObj.setAttribute("y", p.y - 8);// 아이콘 높이 절반(16/2) → 아이콘 중심이 투영점 위에
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -776,7 +776,7 @@ function camMCR() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 12);
+        foreignObj.setAttribute("y", p.y - 10);// 아이콘 높이 절반(20/2) → 아이콘 중심이 투영점 위에
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;
@@ -958,7 +958,7 @@ function camETC() {
 
         var foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
         foreignObj.setAttribute("x", p.x - 50);
-        foreignObj.setAttribute("y", p.y - 12);
+        foreignObj.setAttribute("y", p.y - 10);// 아이콘 높이 절반(20/2) → 아이콘 중심이 투영점 위에
         foreignObj.setAttribute("width", "100");
         foreignObj.setAttribute("height", "60");
         foreignObj.innerHTML = content;

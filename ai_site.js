@@ -25,13 +25,19 @@ function siteAt(lat, lng) {
     return null;
 }
 
-// 지사 전환. 캐시 있으면 바로 치환, 없으면 CSV 5개 로드 후 치환
-function selectSite(key) {
-    if (!SITES[key] || key === currentSite) return;
+// 지사 전환. 캐시 있으면 바로 치환, 없으면 CSV 5개 로드 후 치환.
+// goCenter=true(셀렉트로 직접 고른 경우)면 그 지사 열원으로 지도 이동. 시작·자동 전환 때는 지도 안 움직임
+function selectSite(key, goCenter) {
+    if (!SITES[key]) return;
+    if (key === currentSite) {
+        if (goCenter) goSiteCenter();// 같은 지사 다시 고르면 열원으로만 이동
+        return;
+    }
     currentSite = key;
     document.getElementById("siteSel").value = key;
     if (siteData[key]) {
         applySite(key);
+        if (goCenter) goSiteCenter();
         return;
     }
 
@@ -50,6 +56,7 @@ function selectSite(key) {
         parseETC(texts[4]);
         siteData[key] = {PPG: PPG_all, MH: MH_all, MCR: MCR_all, HDH: HDH_all, ETC: ETC_all};
         applySite(currentSite);// 로드 중 다른 지사로 바뀌었으면 그 지사 배열로 되돌림 (아직 로드 전이면 그쪽 로드가 끝나며 처리)
+        if (goCenter && currentSite === key) goSiteCenter();
     }).catch(function(error) {
         console.error("지사 데이터 로드 오류:", error);
         alert(SITES[key].name + " 데이터 로드 실패\n" + error.message);
@@ -66,6 +73,14 @@ function applySite(key) {
     HDH_all = d.HDH;
     ETC_all = d.ETC;
     mapUpdate();
+}
+
+// 현재 작업 배열의 열원(없으면 ETC 첫 행)으로 지도 이동. 레벨 3 = 배관·맨홀 다 보이는 지사 개요
+function goSiteCenter() {
+    var etc = ETC_all.find(function(e) { return e.TYPE === "열원"; }) || ETC_all[0];
+    if (!etc || !map) return;
+    map.setLevel(3);// 먼저 레벨 (panTo/setLevel 애니메이션 경합 방지)
+    map.setCenter(etc.position);
 }
 
 // 지도 중심이 다른 지사 범위에 들어오면 자동 전환 (지도 idle마다 호출). 어느 범위도 아니면 현재 지사 유지
