@@ -139,20 +139,6 @@ function mapPPG(){
             strokeStyle: 'solid'
         });
 
-        // forEach 콜백 안이라 폴리라인마다 PPG가 따로 잡힘 (for + var였을 땐 모든 클릭이 마지막 PPG를 가리킴)
-        kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
-            var titleText = `${PPG.LINE_NM} (${PPG.srCode || '-'})`;
-            var bodyContent = `
-                <b>설비ID:</b> ${PPG.eqpId || '-'}<br>
-                <b>관경:</b> ${PPG.diaCode || '-'} mm<br>
-                <b>설치일자:</b> ${PPG.competDe || '-'}<br>
-                <b>상태:</b> ${PPG.qltyGrade || '-'}<br>
-                <b>평균깊이:</b> ${PPG.avgDph || '-'} m
-            `;
-
-            openMcrModal(titleText, bodyContent);
-        });
-
         poly.setMap(map);
         mapPPG_poly.push(poly);
         PPG_on.push(PPG);

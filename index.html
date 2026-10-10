@@ -139,7 +139,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            pointer-events: auto; /* 클릭 이벤트를 받으려면 auto, 지도 클릭을 방해하지 않으려면 none */
+            pointer-events: none; /* 클릭은 지도가 받아 가장 가까운 설비를 찾음 (ai_click.js mapClick) */
         }
         .icon1 {/* 아이콘 이미지. 크기 지정 안 함 = PNG 원본 크기 (맨홀·기계실·기타 20px, 핸드홀 16px). 바꾸면 point.js cam*의 y 오프셋도 맞출 것 */
         }
@@ -335,6 +335,7 @@
 <script type="text/javascript" src="ai_line.js"></script>
 <script type="text/javascript" src="point.js"></script>
 <script type="text/javascript" src="ai_site.js"></script>
+<script type="text/javascript" src="ai_click.js"></script>
 <script type="text/javascript">
     var cMode = "map";
 
@@ -408,50 +409,13 @@
             mapUpdate();
         });
 
-        // 지도 클릭 시 근처 배관 검색
+        // 지도 클릭: 로드뷰 모드면 로드뷰 열기, 아니면 가장 가까운 설비 정보 (ai_click.js)
         kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
             if (roadMode_On) {
                 openRoad(mouseEvent.latLng);
                 return;
             }
-            var clickLat = mouseEvent.latLng.getLat();
-            var clickLng = mouseEvent.latLng.getLng();
-            var minDistance = 10; // 선택 허용 최단 거리 threshold (10m 이내)
-            var selectedPPG = null;
-
-            // 현재 화면 영역(mapBounds)에 표시되고 있는 PPG_on 배관들 중에서만 검색
-            PPG_on.forEach(function(PPG) {
-                for (var i = 0; i < PPG.coords.length - 1; i++) {
-                    var pos1 = PPG.coords[i];
-                    var pos2 = PPG.coords[i + 1];
-
-                    // test7.js에 선언된 최단점 계산 함수 활용
-                    var closestPt = getClosestPointOnLine(
-                        clickLat, clickLng,
-                        pos1.getLat(), pos1.getLng(),
-                        pos2.getLat(), pos2.getLng()
-                    );
-
-                    var dist = getDistanceMeter(clickLat, clickLng, closestPt.lat, closestPt.lng);
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        selectedPPG = PPG;
-                    }
-                }
-            });
-
-            // 10m 이내에서 감지된 배관이 있다면 모달 열기
-            if (selectedPPG) {
-                var titleText = `${selectedPPG.LINE_NM} (${selectedPPG.srCode || '-'})`;
-                var bodyContent = `
-                    <b>설비ID:</b> ${selectedPPG.eqpId || '-'}<br>
-                    <b>관경:</b> ${selectedPPG.diaCode || '-'} mm<br>
-                    <b>설치일자:</b> ${selectedPPG.competDe || '-'}<br>
-                    <b>상태:</b> ${selectedPPG.qltyGrade || '-'}<br>
-                    <b>평균깊이:</b> ${selectedPPG.avgDph || '-'} m
-                `;
-                openMcrModal(titleText, bodyContent);
-            }
+            mapClick(mouseEvent.latLng);
         });
 
         //road

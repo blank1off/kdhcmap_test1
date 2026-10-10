@@ -125,27 +125,11 @@ function mapMH() {
 
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
-        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/mh.png" alt="맨홀">
             <span class="label1">${mh.name}</span>
         `;
-
-        contentDiv.onclick = function(e) {
-            if (e && e.stopPropagation) e.stopPropagation();
-
-            var titleText = `${mh.name || '-'}`;
-            var bodyContent = `
-                <b>규격(가로x세로x높이):</b> ${mh.lt || '-'} x ${mh.bt || '-'} x ${mh.hg || '-'} m<br>
-                <b>출입구 깊이:</b> ${mh.dp || '-'} m<br>
-                <b>상태등급:</b> ${mh.grade || '-'} 등급<br>
-                <b>위치설명:</b> ${mh.lc || '-'}<br>
-                <b>설치일자:</b> ${mh.date || '-'}<br>
-            `;
-
-            openMcrModal(titleText, bodyContent);
-        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: mh.position,
@@ -379,26 +363,11 @@ function mapHDH() {
         var iconPath = getHDHIcon(HDH.srCode);
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
-        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="${iconPath}" alt="핸드홀">
             <span class="label1">${HDH.name}(${HDH.srCode})</span>
         `;
-
-        contentDiv.onclick = function(e) {
-            if (e && e.stopPropagation) e.stopPropagation();
-
-            var titleText = `${HDH.name}(${HDH.srCode})`;
-            var bodyContent = `
-                <b>밸브위치:</b> ${HDH.lc || '-'}<br>
-                <b>깊이:</b> ${HDH.dp || '-'} m<br>
-                <b>설치일:</b> ${HDH.date || '-'}<br>
-                <b>등급:</b> ${HDH.grade || '-'}<br>
-            `;
-
-            openMcrModal(titleText, bodyContent);
-        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: HDH.position,
@@ -624,28 +593,11 @@ function mapMCR() {
 
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
-        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="icon/MCR.png" alt="기계실">
             <span class="label1">${MCR.buildName}(${MCR.roomName})</span>
         `;
-
-        contentDiv.onclick = function(e) {
-            if (e && e.stopPropagation) e.stopPropagation();
-
-            var titleText = `${MCR.buildName}(${MCR.roomName})<br>${MCR.buildId}(${MCR.roomId})`;
-            var bodyContent = `
-                <b>차단밸브 관경:</b> ${MCR.dia || '-'} A<br>
-                <b>열부하:</b> ${MCR.heat || '-'} Mcal/h<br>
-                <b>세대수:</b> ${MCR.house || '-'} 세대<br>
-                <b>기계실 위치:</b> ${MCR.roomLc || '-'}<br>
-                <b>밸브 위치:</b> ${MCR.valveLc || '-'}<br>
-                <b>밸브 형태:</b> ${MCR.valveKey || '-'}<br>
-            `;
-
-            openMcrModal(titleText, bodyContent);
-        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: MCR.position,
@@ -871,23 +823,11 @@ function mapETC() {
         var iconPath = getETCIcon(ETC.TYPE);
         var contentDiv = document.createElement('div');
         contentDiv.className = 'overlay1';
-        contentDiv.style.cursor = 'pointer';
 
         contentDiv.innerHTML = `
             <img class="icon1" src="${iconPath}" alt="기타">
             <span class="label1">${ETC.NAME}</span>
         `;
-
-        contentDiv.onclick = function(e) {
-            if (e && e.stopPropagation) e.stopPropagation();
-
-            var titleText = `${ETC.NAME}`;
-            var bodyContent = `
-                <b>특성:</b> ${ETC.ETC1 || '-'}<br>
-            `;
-
-            openMcrModal(titleText, bodyContent);
-        };
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: ETC.position,
