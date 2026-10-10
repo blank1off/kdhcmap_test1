@@ -546,22 +546,20 @@ function camPPG() {
         var p = camPx(c);
         if (!camInner(p.x, p.y)) return;
 
-        var labelText = ttPPG.LINE_NM + ' (' + ttPPG.diaCode + 'A)';
-        var labelClass = (ttPPG.srCode === 'S') ? 'cam-s-pipe' : 'cam-r-pipe';
-        var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
+        var labelClass = (ttPPG.srCode === 'S') ? 'road-s-pipe' : 'road-r-pipe';// 로드뷰 라벨과 같은 스타일(색·굵기·검정 외곽선)
 
-        var textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        textNode.setAttribute('x', p.x.toFixed(1));
-        textNode.setAttribute('y', p.y.toFixed(1));
-        textNode.setAttribute('fill', labelColor);
-        textNode.setAttribute('stroke', '#000000');
-        textNode.setAttribute('paint-order', 'stroke fill');
-        textNode.setAttribute('class', labelClass);
-        textNode.setAttribute('text-anchor', 'middle');
-        textNode.setAttribute('dominant-baseline', 'middle');
-        textNode.textContent = labelText;
+        var foreignObj = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+        foreignObj.setAttribute('x', (p.x - 60).toFixed(1));// 너비 절반만큼 왼쪽 (중앙 정렬)
+        foreignObj.setAttribute('y', (p.y - 20).toFixed(1));// 높이 절반만큼 위
+        foreignObj.setAttribute('width', '120');
+        foreignObj.setAttribute('height', '40');
+        foreignObj.innerHTML = `
+            <div class="${labelClass}" style="text-align: center; white-space: nowrap;">
+                ${ttPPG.diaCode}A<br>(${ttPPG.LINE_NM})
+            </div>
+        `;
 
-        camSVG.appendChild(textNode);
+        camSVG.appendChild(foreignObj);
     });
 }
 

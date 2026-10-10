@@ -103,6 +103,8 @@ var headingFix = parseFloat(localStorage.getItem("headingFix")) || 0;// 수동 �
 var drawn = [];// 마지막에 그린 마커 [{x, y, mh}] (탭 보정용)
 var lastDraw = null;// 마지막 그리기 파라미터 {width, height, f, screenAngle}
 var drawnRot = null, drawnPos = null;// 마지막으로 그렸을 때의 회전행렬·위치 (다시 그릴지 판단용)
+var gpsRaw = null;// 마지막 GPS 원값 {lat, lng}. 보정 버튼 누르면 여기에 posFix 다시 적용
+var posFix = {east: 0, north: 0};// GPS 위치 수동 보정(m). AR 화면 방향 버튼으로 1m씩. 세션 동안만 유지
 var YAW_FILTER = 0.01;// 나침반 보정 속도. 작을수록 안 떨리지만 방위 오차 잡는 데 오래 걸림 (0.01 ≈ 2초)
 var REDRAW_ANGLE = 1;// 카메라 방향(방위+기울기)이 이만큼(°) 이상 바뀌어야 다시 그림. 1° ≈ 11px라 끊겨 보이면 0.3~0.5
 var REDRAW_DIST = 1;// 내 위치가 이만큼(m) 이상 움직여야 다시 그림
@@ -139,11 +141,22 @@ async function openCam() {
         document.getElementById("ui").insertAdjacentHTML("beforeend",
             '<button id="BtnFixReset" class="icon-btn" style="width:auto; padding:0 10px; border-radius:20px; font-size:12px;" onclick="resetFix()" title="방위 보정 초기화">보정 0</button>');
         document.getElementById("camBox").addEventListener("click", camTap);
+        // 위치 보정 패드 (camBox 밖에 둬야 탭이 camTap으로 안 감)
+        document.getElementById("box1").insertAdjacentHTML("beforeend",
+            '<div id="camPad" style="position:fixed; left:10px; bottom:10px; z-index:999; display:none; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px); gap:4px;">' +
+            '<span></span><button class="icon-btn" onclick="nudgePos(0,1)" title="내 위치 북쪽 1m">▲</button><span></span>' +
+            '<button class="icon-btn" onclick="nudgePos(-1,0)" title="내 위치 서쪽 1m">◀</button>' +
+            '<button class="icon-btn" onclick="resetPos()" title="위치 보정 초기화" style="font-size:12px;">0</button>' +
+            '<button class="icon-btn" onclick="nudgePos(1,0)" title="내 위치 동쪽 1m">▶</button>' +
+            '<span></span><button class="icon-btn" onclick="nudgePos(0,-1)" title="내 위치 남쪽 1m">▼</button><span></span>' +
+            '</div>');
     }
     document.getElementById("BtnFixReset").style.display = "block";
+    document.getElementById("camPad").style.display = "grid";
 
     // 이전 상태 초기화
     cmaPos = null;
+    gpsRaw = null;
     heading = null;
     camRot = null;
     camRel = null;
@@ -206,13 +219,8 @@ async function openCam() {
     // 최초 위치
     navigator.geolocation.getCurrentPosition(
         function(position) {
-            cmaPos = {
-                lat:position.coords.latitude,
-                lng:position.coords.longitude
-            };
-
+            setGps(position.coords.latitude, position.coords.longitude);
             console.log("최초 위치:",cmaPos.lat,cmaPos.lng);
-            camUpdate();// 화면 표시
         },
         function(error) {
             console.error("GPS 오류:",error);
@@ -225,11 +233,7 @@ async function openCam() {
     // 위치 변화 감시
     camGeoWatchId =navigator.geolocation.watchPosition(
         function(position) {
-            cmaPos = {
-                lat:position.coords.latitude,
-                lng:position.coords.longitude
-            };
-            camUpdate();
+            setGps(position.coords.latitude, position.coords.longitude);
         },
         function(error) {
             console.log("GPS watch 오류:",error);
@@ -249,6 +253,8 @@ function closeCam() {
     document.getElementById('BtnOpenCam').style.display = 'block';
     var btnFix = document.getElementById("BtnFixReset");
     if (btnFix) btnFix.style.display = "none";
+    var pad = document.getElementById("camPad");
+    if (pad) pad.style.display = "none";
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
@@ -331,7 +337,8 @@ function camEvent(event) {
 function camUpdate() {
     if (cMode !== "cam" || !cmaPos) return;
     document.getElementById("indMe").textContent =
-        cmaPos.lat.toFixed(6) + ", " + cmaPos.lng.toFixed(6);// + " (±" + Math.round(cmaPos.acc) + "m)";
+        cmaPos.lat.toFixed(6) + ", " + cmaPos.lng.toFixed(6) +
+        " 보정 동" + posFix.east + " 북" + posFix.north;
     if (!camRot) {
         document.getElementById("indView").textContent = "센서 없음 (절대 방위 이벤트 안 옴)";
         return;
@@ -404,6 +411,38 @@ function camTap(ev) {
     var brg = (Math.atan2(east, north) * DEG + 360) % 360;
     headingFix = wrap180(headingFix + wrap180(brg - tapHead));
     localStorage.setItem("headingFix", headingFix);
+}
+
+// GPS 원값 저장 후 수동 보정(posFix) 적용. 센서와 같은 입구(camUpdate)로
+function setGps(lat, lng) {
+    gpsRaw = {lat: lat, lng: lng};
+    applyPosFix();
+    camUpdate();
+}
+
+// cmaPos = GPS 원값 + posFix(m). 1° 위도 ≈ 111320m, 경도는 cos(위도) 보정
+function applyPosFix() {
+    if (!gpsRaw) return;
+    cmaPos = {
+        lat: gpsRaw.lat + posFix.north / 111320,
+        lng: gpsRaw.lng + posFix.east / (111320 * Math.cos(gpsRaw.lat * RAD))
+    };
+}
+
+// 방향 버튼: 내 위치를 동(+east)/북(+north) m만큼 이동. 1m는 문턱(REDRAW_DIST)에 걸릴 수 있어 강제로 다시 그림
+function nudgePos(east, north) {
+    posFix.east += east;
+    posFix.north += north;
+    applyPosFix();
+    drawnPos = null;
+    camUpdate();
+}
+
+function resetPos() {
+    posFix = {east: 0, north: 0};
+    applyPosFix();
+    drawnPos = null;
+    camUpdate();
 }
 
 function resetFix() {
