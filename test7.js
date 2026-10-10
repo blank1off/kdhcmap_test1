@@ -138,6 +138,7 @@ async function openCam() {
     if (!document.getElementById("indMe")) {
         document.getElementById("camIndicator").insertAdjacentHTML("beforeend",
             '<div>SRC : <span id="indSrc">-</span></div>' +
+            '<div>GPS : <span id="indGps">-</span></div>' +
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
         document.getElementById("camBox").addEventListener("click", camTap);
@@ -360,9 +361,11 @@ function camEvent(event) {
 // 마지막으로 그린 뒤 카메라 방향이 REDRAW_ANGLE 이상 돌았거나 위치가 REDRAW_DIST 이상 움직였을 때만 그림 (손떨림·GPS 떨림 억제)
 function camUpdate() {
     if (cMode !== "cam" || !cmaPos) return;// 위치 없으면 아무것도 못 함
+    document.getElementById("indGps").textContent =
+        gpsRaw.lat.toFixed(6) + ", " + gpsRaw.lng.toFixed(6) + " ±" + Math.round(gpsRaw.acc) + "m";// GPS 원값. ±는 정확도 반경(m)
     document.getElementById("indMe").textContent =
         cmaPos.lat.toFixed(6) + ", " + cmaPos.lng.toFixed(6) +
-        " ±" + Math.round(gpsRaw.acc) + "m 보정 동" + posFix.east + " 북" + posFix.north;// 보정 적용된 위치, GPS 정확도, 수동 보정량
+        " (보정 동 " + posFix.east + "m, 북 " + posFix.north + "m)";// 패드로 보정한 뒤 위치 = 실제 계산에 쓰는 값
     if (!camRot) {
         document.getElementById("indView").textContent = "센서 없음 (절대 방위 이벤트 안 옴)";
         return;

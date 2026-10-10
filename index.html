@@ -101,12 +101,6 @@
         }
         
 
-        /* 카메라 AR 배관 라벨 (SVG text) */
-        .cam-s-pipe, .cam-r-pipe {
-            font-size: 11px;
-            font-weight: bold;
-        }
-
         /* 포인트 오버레이 */
         .overlay1 {
             display: flex;
@@ -445,8 +439,8 @@
                     position.coords.latitude,
                     position.coords.longitude
                 );
-                map.panTo(myPos);// 지도 이동
-                map.setLevel(1, { animate: true });
+                map.setLevel(1);// 먼저 확대. panTo와 setLevel 애니메이션이 겹치면 옛 중심 기준으로 확대돼 엉뚱한 곳에서 멈춤
+                map.setCenter(myPos);// 그 다음 중심 이동 (즉시)
 
                 // 기존 내 위치 마커 제거
                 if (myPosMarker) myPosMarker.setMap(null);
