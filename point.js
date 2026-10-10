@@ -391,7 +391,6 @@ function mapHDH() {
 
             var titleText = `${HDH.name}(${HDH.srCode})`;
             var bodyContent = `
-                <b>차단밸브 관경:</b> ${HDH.dia || '-'} A<br>
                 <b>밸브위치:</b> ${HDH.lc || '-'}<br>
                 <b>깊이:</b> ${HDH.dp || '-'} m<br>
                 <b>설치일:</b> ${HDH.date || '-'}<br>
@@ -884,7 +883,7 @@ function mapETC() {
 
             var titleText = `${ETC.NAME}`;
             var bodyContent = `
-                <b>차단밸브 관경:</b> ${ETC.ETC1 || '-'}<br>
+                <b>특성:</b> ${ETC.ETC1 || '-'}<br>
             `;
 
             openMcrModal(titleText, bodyContent);

@@ -36,6 +36,15 @@ function parsePPG(csvText) {
     var lines = csvText.trim().split('\n');
     if (lines.length <= 1) return;
 
+    // 따옴표 수가 홀수인 줄 = 따옴표 안에서 줄바꿈된 행. 다음 줄과 합침 (PPG.csv에 LINE_NM 줄바꿈 1건)
+    for (var k = 0; k < lines.length - 1; k++) {
+        if ((lines[k].match(/"/g) || []).length % 2 === 1) {
+            lines[k] += lines[k + 1];
+            lines.splice(k + 1, 1);
+            k--;
+        }
+    }
+
     for (var i = 1; i < lines.length; i++) {
         var line = lines[i].trim();
         if (!line) continue;
@@ -46,7 +55,7 @@ function parsePPG(csvText) {
         if (coordStartIndex === -1 || coordEndIndex === -1) continue;
 
         var propertiesPart = line.substring(0, coordStartIndex);
-        var columns = propertiesPart.split(',');
+        var columns = parseCSVLine(propertiesPart);// point.js. 따옴표 안 콤마 처리 (LINE_NM에 콤마 있는 행). 끝의 빈 칸은 무시됨
 
         var eqpId = columns[0] ? columns[0].trim() : '';
         var srCode = columns[1] ? columns[1].trim() : '';
@@ -116,81 +125,50 @@ function mapPPG(){
     if (!map || PPG_all.length === 0) return;
     if (map.getLevel() >= 5) return;
 
-    for (var i = 0; i < PPG_all.length; i++) {
-        var PPG = PPG_all[i];
+    PPG_all.forEach(function(PPG) {
+        if (!mapBounds.intersects(PPG.bounds)) return;
 
-        if (mapBounds.intersects(PPG.bounds)) {
-            var lineColor = '#FF0000';
-            if (PPG.srCode === 'R') lineColor = '#FFA000';
-            else if (PPG.srCode !== 'S') lineColor = '#888888';
+        var lineColor = '#FF0000';
+        if (PPG.srCode === 'R') lineColor = '#FFA000';
+        else if (PPG.srCode !== 'S') lineColor = '#888888';
 
-            var poly = new kakao.maps.Polyline({
-                path: PPG.coords,
-                strokeWeight: 1,
-                strokeColor: lineColor,
-                strokeStyle: 'solid'
-            });
+        var poly = new kakao.maps.Polyline({
+            path: PPG.coords,
+            strokeWeight: 1,
+            strokeColor: lineColor,
+            strokeStyle: 'solid'
+        });
 
-            kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
-                var titleText = `${PPG.LINE_NM} (${PPG.srCode || '-'})`;
-                var bodyContent = `
-                    <b>설비ID:</b> ${PPG.eqpId || '-'}<br>
-                    <b>관경:</b> ${PPG.diaCode || '-'} mm<br>
-                    <b>설치일자:</b> ${PPG.competDe || '-'}<br>
-                    <b>상태:</b> ${PPG.qltyGrade || '-'}<br>
-                    <b>평균깊이:</b> ${PPG.avgDph || '-'} m
-                `;
-                
-                openMcrModal(titleText, bodyContent);
-            });
+        // forEach 콜백 안이라 폴리라인마다 PPG가 따로 잡힘 (for + var였을 땐 모든 클릭이 마지막 PPG를 가리킴)
+        kakao.maps.event.addListener(poly, 'click', function(mouseEvent) {
+            var titleText = `${PPG.LINE_NM} (${PPG.srCode || '-'})`;
+            var bodyContent = `
+                <b>설비ID:</b> ${PPG.eqpId || '-'}<br>
+                <b>관경:</b> ${PPG.diaCode || '-'} mm<br>
+                <b>설치일자:</b> ${PPG.competDe || '-'}<br>
+                <b>상태:</b> ${PPG.qltyGrade || '-'}<br>
+                <b>평균깊이:</b> ${PPG.avgDph || '-'} m
+            `;
 
-            poly.setMap(map);
-            mapPPG_poly.push(poly);
-            PPG_on.push(PPG);
-        }
-    }
+            openMcrModal(titleText, bodyContent);
+        });
+
+        poly.setMap(map);
+        mapPPG_poly.push(poly);
+        PPG_on.push(PPG);
+    });
 
     if (map.getLevel() >= 3) return;
     if (PPG_on.length === 0) return;
 
-    var visited = new Array(PPG_on.length).fill(false);
-    var idx_groups = [];
-    
-    for (var i = 0; i < PPG_on.length; i++) {
-        if (visited[i]) continue;
+    groupConnected(PPG_on).forEach(function(group) {
+        var ttPPG = group.reduce(function(max, curr) {
+            var maxLen = parseFloat(max.plineLt) || 0;
+            var currLen = parseFloat(curr.plineLt) || 0;
+            return currLen > maxLen ? curr : max;
+        }, group[0]);
 
-        var group = [];
-        var queue = [i];
-        visited[i] = true;
-
-        while (queue.length > 0) {
-            var curr = queue.shift();
-            group.push(curr);
-
-            for (var j = 0; j < PPG_on.length; j++) {
-                if (visited[j]) continue;
-
-                if (isConnected(PPG_on[curr], PPG_on[j])) {
-                    visited[j] = true;
-                    queue.push(j);
-                }
-            }
-        }
-        idx_groups.push(group);
-    }
-
-    for (var g = 0; g < idx_groups.length; g++) {
-        var groupIndices = idx_groups[g];
-
-        var ttIndex = groupIndices.reduce(function(maxIdx, currIdx) {
-            var maxLen = parseFloat(PPG_on[maxIdx].plineLt) || 0;
-            var currLen = parseFloat(PPG_on[currIdx].plineLt) || 0;
-            return currLen > maxLen ? currIdx : maxIdx;
-        }, groupIndices[0]);
-
-        var ttPPG = PPG_on[ttIndex];
         var midCoordIndex = Math.floor((ttPPG.coords.length - 1) / 2);
-
         var p1 = ttPPG.coords[midCoordIndex];
         var p2 = ttPPG.coords[midCoordIndex + 1] || p1;
 
@@ -220,7 +198,7 @@ function mapPPG(){
             overlay.setMap(map);
             mapPPG_label.push(overlay);
         }
-    }
+    });
 }
 
 // ★ 캐시 방식 적용된 roadPPG
@@ -387,33 +365,7 @@ function roadPPG(){
 
     if (visiblePPGs.length === 0) return;
 
-    var visited = new Array(visiblePPGs.length).fill(false);
-    var groups = [];
-
-    for (var i = 0; i < visiblePPGs.length; i++) {
-        if (visited[i]) continue;
-
-        var group = [];
-        var queue = [i];
-        visited[i] = true;
-
-        while (queue.length > 0) {
-            var curr = queue.shift();
-            group.push(visiblePPGs[curr]);
-
-            for (var j = 0; j < visiblePPGs.length; j++) {
-                if (visited[j]) continue;
-
-                if (isConnected(visiblePPGs[curr], visiblePPGs[j])) {
-                    visited[j] = true;
-                    queue.push(j);
-                }
-            }
-        }
-        groups.push(group);
-    }
-
-    groups.forEach(function(group) {
+    groupConnected(visiblePPGs).forEach(function(group) {
         var ttPPG = group.reduce(function(max, curr) {
             var maxLen = parseFloat(max.plineLt) || 0;
             var currLen = parseFloat(curr.plineLt) || 0;
@@ -594,7 +546,7 @@ function camPPG() {
         var p = camPx(c);
         if (!camInner(p.x, p.y)) return;
 
-        var labelText = ttPPG.eqpId + ' (' + ttPPG.diaCode + 'A)';
+        var labelText = ttPPG.LINE_NM + ' (' + ttPPG.diaCode + 'A)';
         var labelClass = (ttPPG.srCode === 'S') ? 'cam-s-pipe' : 'cam-r-pipe';
         var labelColor = (ttPPG.srCode === 'S') ? '#FF0000' : '#FFA000';
 
@@ -868,4 +820,4 @@ function extendToRectEdge(x1, y1, dx, dy, targetWidth, targetHeight) {
     if (candidates.length === 0) return null;
     candidates.sort(function(a, b) { return a.t - b.t; });
     return candidates[0];
-}
+}

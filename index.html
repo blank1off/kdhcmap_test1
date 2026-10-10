@@ -59,7 +59,7 @@
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            /* object-fit: cover; 카메라 비율 맞춤 */
+            object-fit: cover; /* 카메라 비율 맞춤. test7.js의 초점거리(f) 계산이 cover 전제. 빼면 가로/세로가 다른 비율로 늘어나 마커 위치 틀어짐 */
             z-index: 3;
         }
         #camSVG {
@@ -84,8 +84,6 @@
 
         .road-s-pipe {
             color: #FF0000;
-            font-size: 10px;
-            font-weight: bold;
             cursor: pointer;
             user-select: none;
             font-size: 11px;
@@ -95,8 +93,6 @@
 
         .road-r-pipe {
             color: #FFA000;
-            font-size: 10px;
-            font-weight: bold;
             cursor: pointer;
             user-select: none;
             font-size: 11px;
@@ -104,6 +100,12 @@
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; 
         }
         
+
+        /* 카메라 AR 배관 라벨 (SVG text) */
+        .cam-s-pipe, .cam-r-pipe {
+            font-size: 11px;
+            font-weight: bold;
+        }
 
         /* 포인트 오버레이 */
         .overlay1 {
@@ -285,10 +287,8 @@
     </div>
 </body>
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d5897e123b57bd103fea6ae3ef98a284&autoload=false&libraries=services"></script>
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=9833a660d8b4c8bd358a9ccadfb49a4f&libraries=services"></script>
 <script type="text/javascript" src="test7.js"></script>
 <script type="text/javascript" src="ai_line.js"></script>
-<script type="text/javascript" src="ai_line_check.js"></script>
 <script type="text/javascript" src="point.js"></script>
 <script type="text/javascript">
     var cMode = "map";

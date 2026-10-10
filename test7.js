@@ -90,7 +90,7 @@ function roadUpdate() {
 var camUpdateTimer = null;
 var camStream = null;
 var camGeoWatchId = null;// GPS watchPosition ID
-var camPos;
+var cmaPos = null;// 카메라 모드 현재 위치 {lat, lng}
 var RAD = Math.PI / 180, DEG = 180 / Math.PI;
 // 0 = 북쪽// 90 = 동쪽// 180 = 남쪽// 270 = 서쪽
 var heading = null;// 카메라가 보는 방위
@@ -104,7 +104,6 @@ var drawn = [];// 마지막에 그린 마커 [{x, y, mh}] (탭 보정용)
 var lastDraw = null;// 마지막 그리기 파라미터 {width, height, f, screenAngle}
 var drawnRot = null, drawnPos = null;// 마지막으로 그렸을 때의 회전행렬·위치 (다시 그릴지 판단용)
 var YAW_FILTER = 0.01;// 나침반 보정 속도. 작을수록 안 떨리지만 방위 오차 잡는 데 오래 걸림 (0.01 ≈ 2초)
-var GPS_FILTER = 0.3;// GPS 위치 필터. 1이면 필터 없음. 작을수록 제자리 떨림 줄고 걸을 때 지연 큼
 var REDRAW_ANGLE = 1;// 카메라 방향(방위+기울기)이 이만큼(°) 이상 바뀌어야 다시 그림. 1° ≈ 11px라 끊겨 보이면 0.3~0.5
 var REDRAW_DIST = 1;// 내 위치가 이만큼(m) 이상 움직여야 다시 그림
 var CAMERA_FOV = 69;// 카메라 화각(°, 영상 긴 변 기준). 보통 65~75. 마커 간격이 실제보다 좁거나 넓으면 조정
@@ -138,7 +137,7 @@ async function openCam() {
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
         document.getElementById("ui").insertAdjacentHTML("beforeend",
-            '<button id="BtnFixReset" class="btn" onclick="resetFix()">보정 0</button>');
+            '<button id="BtnFixReset" class="icon-btn" style="width:auto; padding:0 10px; border-radius:20px; font-size:12px;" onclick="resetFix()" title="방위 보정 초기화">보정 0</button>');
         document.getElementById("camBox").addEventListener("click", camTap);
     }
     document.getElementById("BtnFixReset").style.display = "block";
@@ -152,6 +151,7 @@ async function openCam() {
     yawOffset = null;
     cntRel = 0; cntAbs = 0;
     drawn = []; lastDraw = null;
+    drawnRot = null; drawnPos = null;// 다시 열 때 1°/1m 문턱이 이전 상태와 비교되지 않게
 
     // 방향 센서 시작 (카메라 await 전에. iOS 권한 요청은 버튼 클릭 직후여야 함. await 뒤면 사용자 제스처 소멸로 거부될 수 있음)
     // iPhone / iPad
@@ -279,7 +279,7 @@ function closeCam() {
     }
 
     if (camUpdateTimer) {// 타이머 제거
-        clearTimeout(camUpdateTimer);
+        cancelAnimationFrame(camUpdateTimer);// requestAnimationFrame id
         camUpdateTimer = null;
     }
 }
@@ -477,21 +477,6 @@ function rayHeading(R, x, y, width, height, f, screenAngle) {
     return (Math.atan2(e, n) * DEG + 360) % 360;
 }
 
-// 두 위경도 좌표 간의 방위각(0~360도)을 구하는 함수
-function getBearing(lat1, lng1, lat2, lng2) {
-    var RAD = Math.PI / 180;
-    var y = Math.sin((lng2 - lng1) * RAD) * Math.cos(lat2 * RAD);
-    var x = Math.cos(lat1 * RAD) * Math.sin(lat2 * RAD) -
-            Math.sin(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos((lng2 - lng1) * RAD);
-    var brng = Math.atan2(y, x) * (180 / Math.PI);
-    return (brng + 360) % 360;
-}
-// 각도 정규화
-function normalizeAngle(angle) {
-    angle = angle % 360;
-    if (angle < 0) angle += 360;
-    return angle;
-}
 // 점 P(lat, lng)에서 선분 AB(aLat, aLng ~ bLat, bLng)까지의 최단 좌표 H 구하기
 function getClosestPointOnLine(pLat, pLng, aLat, aLng, bLat, bLng) {
     var dx = bLng - aLng;
