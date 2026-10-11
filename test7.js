@@ -452,6 +452,9 @@ function miniShow() {
         var start = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
         miniMap = new kakao.maps.Map(el, {center: start, level: 1, mapTypeId: kakao.maps.MapTypeId.HYBRID});
         miniMap.setDraggable(false);// 지도 끌기 끔 (드래그는 방향 조작에 씀). 핀치 줌은 됨
+        // 상단 안내 문구 (클릭 안 가로챔)
+        el.insertAdjacentHTML("beforeend",
+            '<div style="position:absolute; top:0; left:0; right:0; z-index:100; font-size:10px; font-family:monospace; color:#00ff00; background:rgba(0,0,0,0.6); text-align:center; padding:2px 0; pointer-events:none;">탭 = 위치 이동 · 드래그 = 보는 방향</div>');
         // 내 위치 마커: 파란 점
         var dot = new kakao.maps.MarkerImage(
             'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#1E88E5" stroke="#fff" stroke-width="2"/></svg>'),
