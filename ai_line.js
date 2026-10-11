@@ -660,7 +660,7 @@ function make_roadPPG_over(pos, PPGidx, pointIdx, PPG) {
     element.innerHTML = '●';
 
     var overlay = new kakao.maps.CustomOverlay({
-        position: pos,
+        position: roadShift(pos),// 수동 보정 (test7.js)
         content: element,
         xAnchor: 0.5,
         yAnchor: 0.5

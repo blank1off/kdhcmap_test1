@@ -197,7 +197,7 @@ function roadMH() {
             `;
 
             var customOverlay = new kakao.maps.CustomOverlay({
-                position: mh.position,
+                position: roadShift(mh.position),// 수동 보정 (test7.js)
                 content: content,
                 xAnchor: 0.5,
                 yAnchor: 0.5
@@ -440,7 +440,7 @@ function roadHDH() {
             `;
 
             var customOverlay = new kakao.maps.CustomOverlay({
-                position: HDH.position,
+                position: roadShift(HDH.position),
                 content: content,
                 xAnchor: 0.5,
                 yAnchor: 0.5
@@ -673,7 +673,7 @@ function roadMCR() {
             `;
 
             var customOverlay = new kakao.maps.CustomOverlay({
-                position: MCR.position,
+                position: roadShift(MCR.position),
                 content: content,
                 xAnchor: 0.5,
                 yAnchor: 0.5
@@ -876,7 +876,7 @@ function roadETC() {
         `;
 
         var customOverlay = new kakao.maps.CustomOverlay({
-            position: ETC.position,
+            position: roadShift(ETC.position),
             content: content,
             xAnchor: 0.5,
             yAnchor: 0.5

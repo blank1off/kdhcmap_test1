@@ -2,7 +2,8 @@ var mapBounds;
 
 var roadUpdateTimer = null;
 var roadMaxD = 30;
-var ROAD_ALTITUDE = -2.4;// 로드뷰 오버레이 높이(m, 카메라 기준). 0 = 수평선(카메라 높이 약 2.4m). 지면 설비는 그만큼 음수. 마커가 뚜껑보다 위면 더 작게(-3), 땅에 박히면 더 크게(-2)
+var ROAD_ALTITUDE = -1;// 로드뷰 오버레이 높이(m). +가 위. 현장 시험: -5 땅속, +5 하늘, -2.4~-1 사이가 뚜껑 근처. 0 기준이 수평선은 아닌 듯(API가 카메라 높이 일부 처리)
+var roadFix = {east: 0, north: 0};// 로드뷰 수동 위치 보정(m). 패드 버튼으로 1m씩. 파노라마 위치 오차 맞추기용. 세션 동안 유지, 중앙 버튼으로 초기화
 var roadPos;
 
 var roadRect = null;
@@ -26,6 +27,10 @@ function openRoad(position) {
     allNone();
     document.getElementById('roadBox').style.display = 'block';
     document.getElementById('BtnCloseRoad').style.display = 'block';
+    roadFix = {east: 0, north: 0};// 열 때마다 초기화 (파노라마마다 위치 오차 다름)
+    ensurePad();
+    document.getElementById("camPad").style.display = "grid";
+    padInfo();
 
     roadView.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
@@ -48,6 +53,10 @@ function closeRoad() {
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
     document.getElementById('BtnOpenCam').style.display = 'block';
+    document.getElementById('BtnOpenManual').style.display = 'block';
+
+    var pad = document.getElementById("camPad");
+    if (pad) pad.style.display = "none";
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
@@ -98,7 +107,7 @@ var RAD = Math.PI / 180, DEG = 180 / Math.PI;
 var heading = null;// 카메라가 보는 방위
 var camRot = null;// 그리기용 기기→지구 회전행렬 9개. null이면 아직 절대 방위 없음
 var camRel = null;// 상대 orientation 행렬 (자이로 기반, 부드럽지만 방위 기준이 임의)
-var relSeen = false;// 상대 orientation 이벤트를 받은 적 있는지 (없는 기기는 절대 이벤트로 대용)
+var camRelSrc = "none";// camRel 출처: none / default(센서 없음, 세워 든 자세 가정) / abs(자이로 없는 폰) / rel(자이로). 바뀌면 yaw 기준 다시 잡음
 var yawOffset = null;// 절대 방위 - 상대 방위 (°). 느린 필터로 추적
 var cntRel = 0, cntAbs = 0;// 시험용: 이벤트 종류별 개수
 var headingFix = parseFloat(localStorage.getItem("headingFix")) || 0;// 수동 방위 보정(°). 화면에서 실제 맨홀 탭하면 갱신. localStorage 저장
@@ -117,6 +126,12 @@ var CAMERA_HEIGHT = 1.5;// 카메라 높이(m). 맨홀은 지면이라 이만큼
 var MAG_DECLINATION = -8.7;// 자기 편각(°). 분당 2026년 약 -8.7(서편각)
 var camDistance = 30;// 표시 범위(m)
 
+// 수동 AR: GPS는 열 때 1번만, 방위는 나침반 대신 미니맵(탭한 방향) + 자이로 상대 회전. 센서 없는 PC에서도 동작
+var manualAR = false;// 수동 AR 모드 여부 (openCam(true))
+var manualHeading = 0;// 수동 모드 방위(°). 미니맵 탭·화면 탭으로 설정
+var manualSet = false;// 수동 방위를 정했는지. 전엔 첫 나침반 값으로 초기화(있으면)
+var miniMap = null, miniMarker = null, miniArrow = null;// 미니맵, 내 위치 마커(드래그), 방향 화살표
+
 //그리기 공통
 var camWt = 0;
 var camHt = 0;
@@ -124,12 +139,13 @@ var cosLat = 0;
 var f;
 var screenAngle = 0;
 
-async function openCam() {
+async function openCam(manual) {// manual=true면 수동 AR
     if (!navigator.mediaDevices ||!navigator.mediaDevices.getUserMedia){
         alert("이 브라우저에서는 카메라를 사용할 수 없습니다.");
         return;
     }
     cMode = "cam";// 현재 모드
+    manualAR = !!manual;
     allNone();// 기존 화면 숨기기
     document.getElementById("camBox").style.display = "block";
     document.getElementById("BtnCloseCam").style.display = "block";
@@ -144,18 +160,13 @@ async function openCam() {
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
         document.getElementById("camBox").addEventListener("click", camTap);
-        // 보정 패드: 4방향 = 내 위치 1m 이동, 중앙 = 방위+위치 보정 초기화. 하단 중앙 (camBox 밖에 둬야 탭이 camTap으로 안 감)
-        document.getElementById("box1").insertAdjacentHTML("beforeend",
-            '<div id="camPad" style="position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:999; display:none; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:6px;">' +
-            '<span></span><button class="icon-btn" onclick="nudgePos(0,1)" title="내 위치 북쪽 1m">▲</button><span></span>' +
-            '<button class="icon-btn" onclick="nudgePos(-1,0)" title="내 위치 서쪽 1m">◀</button>' +
-            '<button class="icon-btn" onclick="resetAll()" title="보정 초기화 (방위+위치)" style="font-size:12px;">0</button>' +
-            '<button class="icon-btn" onclick="nudgePos(1,0)" title="내 위치 동쪽 1m">▶</button>' +
-            '<span></span><button class="icon-btn" onclick="nudgePos(0,-1)" title="내 위치 남쪽 1m">▼</button><span></span>' +
-            '</div>');
     }
+    posFix = {east: 0, north: 0};// 열 때마다 초기화 (GPS 오차는 매번 다름). 방위 보정(headingFix)은 기기 고유라 유지
+    ensurePad();
     document.getElementById("camPad").style.display = "grid";
-    document.getElementById("camIndicator").style.bottom = "150px";// 패드(132px) 위로
+    padInfo();
+    document.getElementById("camPad").style.bottom = manualAR ? "180px" : "10px";// 수동이면 미니맵(170px) 위로
+    document.getElementById("camIndicator").style.bottom = manualAR ? "345px" : "175px";// 패드 위로
 
     // 이전 상태 초기화
     cmaPos = null;
@@ -163,9 +174,17 @@ async function openCam() {
     heading = null;
     camRot = null;
     camRel = null;
-    relSeen = false;
+    camRelSrc = "none";
     yawOffset = null;
     cntRel = 0; cntAbs = 0; yawN = 0;
+    manualSet = false;
+    if (manualAR) {// 센서 이벤트가 안 와도(PC) 그릴 수 있게 세워 든 자세로 시작. 센서 오면 교체됨
+        camRel = rotMatrix(0, 90, 0);
+        camRelSrc = "default";
+        manualHeading = 0;
+        manualAlign();
+        applyYaw();
+    }
     drawn = []; lastDraw = null;
     drawnRot = null; drawnPos = null;// 다시 열 때 1°/1m 문턱이 이전 상태와 비교되지 않게
 
@@ -212,8 +231,9 @@ async function openCam() {
         return;
     }
 
-    // GPS 시작
+    // GPS 시작. 수동 AR은 최초 1번만 받고 이후는 미니맵 마커가 내 위치
     if (!navigator.geolocation) {
+        if (manualAR) { manualStartAtMap(); return; }
         alert("이 기기에서는 위치 정보를 사용할 수 없습니다.");
         return;
     }
@@ -224,15 +244,18 @@ async function openCam() {
         function(position) {
             setGps(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
             console.log("최초 위치:",cmaPos.lat,cmaPos.lng);
+            if (manualAR) miniShow();// 수동: 위치는 여기까지. 이후는 미니맵 마커
         },
         function(error) {
             console.error("GPS 오류:",error);
             if (error.code === 1) alert("위치 권한이 허용되지 않았습니다.");
             else if (error.code === 2) alert("현재 위치를 확인할 수 없습니다.");
             else if (error.code === 3) alert("위치 확인 시간이 초과되었습니다.");
+            if (manualAR) manualStartAtMap();// 수동: GPS 없어도 지도 중심에서 시작
         },
        {enableHighAccuracy: true,maximumAge: 3000,timeout: 10000}
     );
+    if (manualAR) return;// 수동은 위치 감시 안 함
     // 위치 변화 감시
     camGeoWatchId =navigator.geolocation.watchPosition(
         function(position) {
@@ -255,9 +278,12 @@ function closeCam() {
     document.getElementById('BtnMyLoc').style.display = 'block';
     document.getElementById('BtnRoadMode').style.display = 'block';
     document.getElementById('BtnOpenCam').style.display = 'block';
+    document.getElementById('BtnOpenManual').style.display = 'block';
     var pad = document.getElementById("camPad");
     if (pad) pad.style.display = "none";
     document.getElementById("camIndicator").style.bottom = "10px";
+    miniHide();
+    manualAR = false;
 
     map.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
 
@@ -316,17 +342,19 @@ function camEvent(event) {
     // 1. 상대 orientation(camRel) 갱신
     //    상대 이벤트 = 자이로 기반. 부드럽고 떨림 없지만 방위 기준이 임의(켤 때마다 다름)
     //    절대 이벤트 = 자력계 포함. 방위는 맞지만 떨리고 기울이면 오차 큼
+    //    camRel 출처가 바뀌면(없음/기본 → 절대 → 상대) 기준 프레임이 달라지므로 yaw 기준을 다시 잡음 (yawReset)
+    //    (안 하면 오프셋이 엉뚱한 값으로 굳고 1%씩만 따라가서 몇 초 동안 마커가 옆으로 흐름)
     if (!isAbs) {
-        // 절대 이벤트로 임시 운용하다 상대 이벤트가 처음 오면 기준 프레임이 바뀜 → 오프셋 다시 시작
-        // (안 하면 오프셋이 0으로 굳고 1%씩만 따라가서 몇 초 동안 마커가 옆으로 흐름)
-        if (!relSeen) { yawOffset = null; yawN = 0; }
+        if (camRelSrc !== "rel") { camRelSrc = "rel"; camRel = R; yawReset(); }
         camRel = R;// 그리기에 쓸 자세는 항상 상대 이벤트 것
-        relSeen = true;
         cntRel++;// 표시용 카운터
     }
     else {
         cntAbs++;// 표시용 카운터
-        if (!relSeen) camRel = R;// 자이로 없는 폰: 상대 이벤트가 안 오므로 절대 이벤트로 대용
+        if (camRelSrc !== "rel") {// 자이로 없는 폰: 상대 이벤트가 안 오므로 절대 이벤트로 대용
+            if (camRelSrc !== "abs") { camRelSrc = "abs"; camRel = R; yawReset(); }
+            camRel = R;
+        }
     }
     if (!camRel) return;
 
@@ -334,7 +362,15 @@ function camEvent(event) {
     var ref = compass != null ? compass : (isAbs ? headingOf(R) : null);// 절대 방위 샘플. iOS=나침반값, 안드로이드=절대 행렬의 방위, 상대 이벤트=없음
     //    camRel[2], camRel[5] = 기기 z축의 동/북 성분. 그 크기 = 카메라 시선의 수평 성분 (0.3 미만 = 거의 수직 아래)
     //    camRel[8] = 기기 z축의 위 성분. z는 시선의 반대라 음수면 카메라가 위를 봄. 둘 다 방위가 불안정하니 샘플 건너뜀
-    if (ref != null && Math.hypot(camRel[2], camRel[5]) > 0.3 && camRel[8] > -0.1) {
+    if (manualAR) {
+        // 수동: 나침반은 안 씀. 다만 아직 방위를 안 정했으면 첫 나침반 값으로 시작점만 잡아줌 (틀리면 미니맵 탭으로 고침)
+        if (!manualSet && ref != null && Math.hypot(camRel[2], camRel[5]) > 0.3) {
+            manualHeading = ((ref + MAG_DECLINATION + headingFix) % 360 + 360) % 360;
+            manualSet = true;
+            manualAlign();
+        }
+    }
+    else if (ref != null && Math.hypot(camRel[2], camRel[5]) > 0.3 && camRel[8] > -0.1) {
         var sample = wrap180(ref - headingOf(camRel));// 이번 샘플의 오프셋 (-180~180)
         yawN++;
         var k = Math.max(YAW_FILTER, 1 / yawN);// 필터 계수: 1번째 1.0, 2번째 0.5 … = 초반엔 단순 평균(빠른 수렴), 100번째부터 YAW_FILTER(느린 추적)
@@ -351,13 +387,120 @@ function camEvent(event) {
         " / offset " + (yawOffset == null ? "-" : yawOffset.toFixed(1)) + " / fix " + headingFix.toFixed(1);
     if (yawOffset == null) return;// 아직 절대 기준 없음 → 못 그림
 
-    // 3. 그리기용 행렬 camRot = 상대 행렬을 지구 z축 기준으로 (yaw 오프셋 + 자기 편각 + 수동 보정)만큼 돌린 것
+    // 3. 그리기용 행렬 camRot 계산(applyYaw) 후 다시 그릴지 판단
+    applyYaw();
+    camUpdate();
+}
+
+// camRot = camRel을 지구 z축 기준으로 yaw 보정만큼 돌린 것. 자동: 나침반 오프셋 + 자기 편각 + 탭 보정. 수동: 미니맵 방위 오프셋만
+function applyYaw() {
+    if (!camRel || yawOffset == null) return;
     camRot = camRel.slice();// 복사 (camRel은 보존)
-    rotateYaw(camRot, -(yawOffset + MAG_DECLINATION + headingFix));// rotateYaw는 방위를 theta만큼 "줄이므로" 더하려면 음수
+    rotateYaw(camRot, -(manualAR ? yawOffset : yawOffset + MAG_DECLINATION + headingFix));// rotateYaw는 방위를 theta만큼 "줄이므로" 더하려면 음수
     heading = headingOf(camRot);// 카메라가 보는 진북 기준 방위
     document.getElementById("indHeading").textContent = heading.toFixed(2);
+    miniArrowUpdate();
+}
 
-    camUpdate();// 다시 그릴지 판단
+// camRel 기준 프레임이 바뀔 때 yaw 기준 다시 잡기. 자동: 나침반 샘플 처음부터, 수동: 지금 자세 = manualHeading
+function yawReset() {
+    if (manualAR) manualAlign();
+    else { yawOffset = null; yawN = 0; }
+}
+
+// ───────── 수동 AR ─────────
+// 지금 자세(camRel)가 manualHeading을 보는 것으로 yaw 오프셋 설정. 이후엔 자이로가 상대 회전을 따라감 (자이로 드리프트 생기면 다시 탭)
+function manualAlign() {
+    if (!camRel) return;
+    yawOffset = wrap180(manualHeading - headingOf(camRel));
+}
+
+// 미니맵 탭·화면 탭으로 방위 지정
+function setManualHeading(h) {
+    manualHeading = (h % 360 + 360) % 360;
+    manualSet = true;
+    manualAlign();
+    applyYaw();
+    drawnRot = null;// 문턱 무시하고 다시 그림
+    camUpdate();
+}
+
+// 미니맵 마커 드래그 → 내 위치. 패드 보정은 0부터
+function setManualPos(lat, lng) {
+    gpsRaw = {lat: lat, lng: lng, acc: 0};
+    posFix = {east: 0, north: 0};
+    applyPosFix();
+    padInfo();
+    drawnPos = null;
+    camUpdate();
+    miniSync();
+}
+
+// GPS 못 받을 때(PC 등): 지도 중심을 내 위치로
+function manualStartAtMap() {
+    var c = map.getCenter();
+    setGps(c.getLat(), c.getLng(), 0);
+    miniShow();
+}
+
+// 미니맵 생성(1회)·표시. 위성(HYBRID) 레벨 1. 마커 드래그 = 내 위치, 지도 탭 = 그 지점을 보는 방위
+function miniShow() {
+    if (!miniMap) {
+        document.getElementById("box1").insertAdjacentHTML("beforeend",
+            '<div id="miniMap" style="position:fixed; left:0; bottom:0; width:100%; height:170px; z-index:998; border-top:2px solid #425470;"></div>');
+        var el = document.getElementById("miniMap");
+        var start = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
+        miniMap = new kakao.maps.Map(el, {center: start, level: 1, mapTypeId: kakao.maps.MapTypeId.HYBRID});
+        // 내 위치 마커: 파란 점, 드래그 가능
+        var dot = new kakao.maps.MarkerImage(
+            'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#1E88E5" stroke="#fff" stroke-width="2"/></svg>'),
+            new kakao.maps.Size(18, 18), {offset: new kakao.maps.Point(9, 9)});
+        miniMarker = new kakao.maps.Marker({position: start, image: dot, draggable: true, map: miniMap, zIndex: 10});
+        kakao.maps.event.addListener(miniMarker, 'drag', function() { miniArrow.setPosition(miniMarker.getPosition()); });
+        kakao.maps.event.addListener(miniMarker, 'dragend', function() {
+            var p = miniMarker.getPosition();
+            setManualPos(p.getLat(), p.getLng());
+        });
+        // 방향 화살표: 마커 위에 세워진 삼각형, 밑변 중앙을 축으로 heading만큼 회전
+        miniArrow = new kakao.maps.CustomOverlay({
+            position: start,
+            content: '<div id="miniArrowEl" style="width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:28px solid #1E88E5; opacity:0.85; transform-origin:50% 100%; pointer-events:none;"></div>',
+            xAnchor: 0.5, yAnchor: 1, zIndex: 5
+        });
+        miniArrow.setMap(miniMap);
+        // 지도 탭 = 내 위치에서 그 지점을 보는 방위
+        kakao.maps.event.addListener(miniMap, 'click', function(e) {
+            var p = miniMarker.getPosition();
+            var east = (e.latLng.getLng() - p.getLng()) * 111320 * Math.cos(p.getLat() * RAD);
+            var north = (e.latLng.getLat() - p.getLat()) * 111320;
+            setManualHeading(Math.atan2(east, north) * DEG);
+        });
+    } else {
+        document.getElementById("miniMap").style.display = "block";
+        miniMap.relayout();
+        miniSync();
+        miniMap.setCenter(miniMarker.getPosition());
+    }
+    miniArrowUpdate();
+}
+
+function miniHide() {
+    var el = document.getElementById("miniMap");
+    if (el) el.style.display = "none";
+}
+
+// 미니맵 마커·화살표를 cmaPos로 (패드 보정 뒤 등)
+function miniSync() {
+    if (!miniMarker || !cmaPos) return;
+    var p = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
+    miniMarker.setPosition(p);
+    miniArrow.setPosition(p);
+}
+
+// 화살표를 현재 방위로 회전 (CSS rotate는 시계방향 = 방위와 같음)
+function miniArrowUpdate() {
+    var el = document.getElementById("miniArrowEl");
+    if (el && heading != null) el.style.transform = "rotate(" + heading.toFixed(1) + "deg)";
 }
 
 // 다시 그릴지 결정하는 공통 입구. 센서(camEvent)와 GPS(setGps), 보정 버튼 모두 여기로 들어옴.
@@ -441,8 +584,59 @@ function camTap(ev) {
     var east = (best.mh.position.getLng() - cmaPos.lng) * 111320 * cosLat;// 마커까지 동쪽 거리 m
     var north = (best.mh.position.getLat() - cmaPos.lat) * 111320;// 마커까지 북쪽 거리 m
     var brg = (Math.atan2(east, north) * DEG + 360) % 360;// 마커의 실제 방위 (GPS·CSV 기준)
+    if (manualAR) { setManualHeading(heading + wrap180(brg - tapHead)); return; }// 수동: 미니맵 방위를 그만큼 돌림 (저장 안 함)
     headingFix = wrap180(headingFix + wrap180(brg - tapHead));// 실제 방위 - 추정 방위 만큼 누적 보정
     localStorage.setItem("headingFix", headingFix);// 나침반 편차는 기기 고유라 저장
+}
+
+// ───────── 보정 패드 (카메라·로드뷰 공용) ─────────
+// 4방향 = "내 위치"를 동/서/남/북 1m 이동, 중앙 = 초기화. 하단 중앙. camBox 밖(box1)에 둬야 탭이 camTap으로 안 감
+function ensurePad() {
+    if (document.getElementById("camPad")) return;
+    document.getElementById("box1").insertAdjacentHTML("beforeend",
+        '<div id="camPad" style="position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:999; display:none; grid-template-columns:repeat(3,40px); grid-template-rows:auto repeat(3,40px); gap:6px; justify-items:center;">' +
+        '<div id="padInfo" style="grid-column:1/4; font-size:11px; color:#fff; background:rgba(0,0,0,0.5); padding:2px 6px; border-radius:4px; white-space:nowrap;"></div>' +
+        '<span></span><button class="icon-btn" onclick="padNudge(0,1)" title="내 위치 북쪽 1m">▲</button><span></span>' +
+        '<button class="icon-btn" onclick="padNudge(-1,0)" title="내 위치 서쪽 1m">◀</button>' +
+        '<button class="icon-btn" onclick="padReset()" title="보정 초기화" style="font-size:12px;">0</button>' +
+        '<button class="icon-btn" onclick="padNudge(1,0)" title="내 위치 동쪽 1m">▶</button>' +
+        '<span></span><button class="icon-btn" onclick="padNudge(0,-1)" title="내 위치 남쪽 1m">▼</button><span></span>' +
+        '</div>');
+}
+
+// 패드 버튼: 모드에 따라 카메라(posFix) 또는 로드뷰(roadFix) 보정
+function padNudge(east, north) {
+    if (cMode === "cam") nudgePos(east, north);
+    else if (cMode === "road") {
+        roadFix.east += east;
+        roadFix.north += north;
+        roadEvent();// SVG 비우고 다시 그림
+    }
+    padInfo();
+}
+
+function padReset() {
+    if (cMode === "cam") resetAll();
+    else if (cMode === "road") {
+        roadFix = {east: 0, north: 0};
+        roadEvent();
+    }
+    padInfo();
+}
+
+// 패드 위 현재 보정량 표시
+function padInfo() {
+    var f = cMode === "road" ? roadFix : posFix;
+    document.getElementById("padInfo").textContent =
+        "내 위치 보정 동 " + f.east + "m 북 " + f.north + "m" + (cMode === "cam" ? " (0 = 방위+위치 초기화)" : "");
+}
+
+// 로드뷰 오버레이 좌표에 수동 보정 적용. "내 위치를 동/북으로 옮김" = 설비를 반대로 옮김 (파노라마 자체는 못 옮기므로)
+function roadShift(pos) {
+    if (!roadFix.east && !roadFix.north) return pos;
+    var lat = pos.getLat() - roadFix.north / 111320;// 북쪽 m → 위도 °
+    var lng = pos.getLng() - roadFix.east / (111320 * Math.cos(pos.getLat() * RAD));// 동쪽 m → 경도 °
+    return new kakao.maps.LatLng(lat, lng);
 }
 
 // GPS 원값 저장 후 수동 보정(posFix) 적용. 센서와 같은 입구(camUpdate)로
@@ -471,6 +665,7 @@ function nudgePos(east, north) {
     applyPosFix();
     drawnPos = null;// 문턱 검사 건너뛰게
     camUpdate();
+    miniSync();// 수동 AR이면 미니맵 마커도 이동
 }
 
 function resetPos() {
@@ -478,6 +673,7 @@ function resetPos() {
     applyPosFix();
     drawnPos = null;
     camUpdate();
+    miniSync();
 }
 
 // 패드 중앙 버튼: 방위 보정(headingFix) + 위치 보정(posFix) 모두 초기화
@@ -603,4 +799,4 @@ function getPointAtRatio(pos1, pos2, ratio) {
     var lng = lng1 + (lng2 - lng1) * ratio;
 
     return new kakao.maps.LatLng(lat, lng);
-}
+}
