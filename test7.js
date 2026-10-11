@@ -2,6 +2,7 @@ var mapBounds;
 
 var roadUpdateTimer = null;
 var roadMaxD = 30;
+var ROAD_ALTITUDE = -2.4;// 로드뷰 오버레이 높이(m, 카메라 기준). 0 = 수평선(카메라 높이 약 2.4m). 지면 설비는 그만큼 음수. 마커가 뚜껑보다 위면 더 작게(-3), 땅에 박히면 더 크게(-2)
 var roadPos;
 
 var roadRect = null;

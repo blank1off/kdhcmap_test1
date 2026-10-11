@@ -203,6 +203,7 @@ function roadMH() {
                 yAnchor: 0.5
             });
 
+            customOverlay.setAltitude(ROAD_ALTITUDE);// 지면 설비: 카메라 기준 높이 (test7.js 노브)
             customOverlay.setMap(roadView);
             roadHM_Over.push(customOverlay);
         }
@@ -445,6 +446,7 @@ function roadHDH() {
                 yAnchor: 0.5
             });
 
+            customOverlay.setAltitude(ROAD_ALTITUDE);// 지면 설비: 카메라 기준 높이 (test7.js 노브)
             customOverlay.setMap(roadView);
             roadHDH_Over.push(customOverlay);
         }
@@ -677,6 +679,7 @@ function roadMCR() {
                 yAnchor: 0.5
             });
 
+            customOverlay.setAltitude(ROAD_ALTITUDE);// 지면 설비: 카메라 기준 높이 (test7.js 노브)
             customOverlay.setMap(roadView);
             roadMCR_Over.push(customOverlay);
         }
@@ -879,6 +882,7 @@ function roadETC() {
             yAnchor: 0.5
         });
 
+        customOverlay.setAltitude(ROAD_ALTITUDE);// 지면 설비: 카메라 기준 높이 (test7.js 노브)
         customOverlay.setMap(roadView);
         roadETC_Over.push(customOverlay);
     });

@@ -666,6 +666,7 @@ function make_roadPPG_over(pos, PPGidx, pointIdx, PPG) {
         yAnchor: 0.5
     });    
 
+    overlay.setAltitude(ROAD_ALTITUDE);// 배관 끝점·임시점 모두 지면 높이 (test7.js 노브)
     overlay.setMap(roadView);
     roadPPG_over.push(overlay);
 
