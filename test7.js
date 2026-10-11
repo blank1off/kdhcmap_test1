@@ -29,7 +29,7 @@ function openRoad(position) {
     document.getElementById('BtnCloseRoad').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
     roadFix = {east: 0, north: 0};// 열 때마다 초기화 (파노라마마다 위치 오차 다름)
     ensurePad();
-    padPlace(manualAR ? "left" : "center");// 수동 AR은 좌하단(미니맵이 우하단), 그 외 하단 중앙
+    padPlace(manualAR ? "right" : "center");// 수동 AR은 우하단(미니맵이 좌하단), 그 외 하단 중앙
     padInfo();
 
     roadView.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
@@ -163,7 +163,7 @@ async function openCam(manual) {// manual=true면 수동 AR
     }
     posFix = {east: 0, north: 0};// 열 때마다 초기화 (GPS 오차는 매번 다름). 방위 보정(headingFix)은 기기 고유라 유지
     ensurePad();
-    padPlace(manualAR ? "left" : "center");// 수동 AR은 좌하단(미니맵이 우하단), 그 외 하단 중앙
+    padPlace(manualAR ? "right" : "center");// 수동 AR은 우하단(미니맵이 좌하단), 그 외 하단 중앙
     padInfo();
     document.getElementById("camIndicator").style.display = manualAR ? "none" : "block";// 인디케이터는 자동 AR에서만
     document.getElementById("camIndicator").style.bottom = "175px";// 패드 위로
@@ -443,11 +443,11 @@ function manualStartAtMap() {
     miniShow();
 }
 
-// 미니맵 생성(1회)·표시. 우하단 200×200, 위성(HYBRID) 레벨 1. 탭 = 그 지점으로 내 위치 이동, 드래그 = 마커에서 손가락 쪽을 보는 방위
+// 미니맵 생성(1회)·표시. 좌하단 200×200, 위성(HYBRID) 레벨 1. 탭 = 그 지점으로 내 위치 이동, 드래그 = 마커에서 손가락 쪽을 보는 방위
 function miniShow() {
     if (!miniMap) {
         document.getElementById("box1").insertAdjacentHTML("beforeend",
-            '<div id="miniMap" style="position:fixed; right:10px; bottom:10px; width:200px; height:200px; z-index:998; border:2px solid #425470; border-radius:8px; overflow:hidden; touch-action:none;"></div>');
+            '<div id="miniMap" style="position:fixed; left:10px; bottom:10px; width:200px; height:200px; z-index:998; border:2px solid #425470; border-radius:8px; overflow:hidden; touch-action:none;"></div>');
         var el = document.getElementById("miniMap");
         var start = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
         miniMap = new kakao.maps.Map(el, {center: start, level: 1, mapTypeId: kakao.maps.MapTypeId.HYBRID});
@@ -617,7 +617,7 @@ function ensurePad() {
     if (document.getElementById("camPad")) return;
     document.getElementById("box1").insertAdjacentHTML("beforeend",
         '<div id="camPad" style="position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:999; display:none; grid-template-columns:repeat(3,40px); grid-template-rows:auto repeat(3,40px); gap:6px; justify-items:center;">' +
-        '<div id="padInfo" style="grid-column:1/4; font-size:11px; color:#fff; background:rgba(0,0,0,0.5); padding:2px 6px; border-radius:4px; white-space:nowrap;"></div>' +
+        '<div id="padInfo" style="grid-column:1/4; font-size:11px; color:#00ff00; font-family:monospace; white-space:nowrap;"></div>' +
         '<span></span><button class="icon-btn" onclick="padNudge(0,1)" title="내 위치 북쪽 1m">▲</button><span></span>' +
         '<button class="icon-btn" onclick="padNudge(-1,0)" title="내 위치 서쪽 1m">◀</button>' +
         '<button class="icon-btn" onclick="padReset()" title="보정 초기화" style="font-size:9px; font-weight:bold;">RESET</button>' +
@@ -626,13 +626,13 @@ function ensurePad() {
         '</div>');
 }
 
-// 패드 위치: center = 하단 중앙(자동 AR·로드뷰), left = 좌하단(수동 AR, 미니맵이 우하단)
+// 패드 위치: center = 하단 중앙(자동 AR·로드뷰), right = 우하단(수동 AR, 미니맵이 좌하단)
 function padPlace(side) {
     var pad = document.getElementById("camPad");
     pad.style.display = "grid";
     pad.style.bottom = "10px";
-    pad.style.left = side === "left" ? "10px" : "50%";
-    pad.style.transform = side === "left" ? "none" : "translateX(-50%)";
+    if (side === "right") { pad.style.left = "auto"; pad.style.right = "10px"; pad.style.transform = "none"; }
+    else { pad.style.left = "50%"; pad.style.right = "auto"; pad.style.transform = "translateX(-50%)"; }
 }
 
 // 패드 버튼: 모드에 따라 카메라(posFix) 또는 로드뷰(roadFix) 보정

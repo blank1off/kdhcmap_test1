@@ -172,6 +172,23 @@
             pointer-events: none;
         }
 
+        /* 보정 패드 (test7.js ensurePad): 인디케이터처럼 검정 반투명 바탕 + 녹색 테두리·버튼 */
+        #camPad {
+            background: rgba(0, 0, 0, 0.65);
+            border: 1px solid #00ff00;
+            border-radius: 8px;
+            padding: 6px;
+        }
+        #camPad .icon-btn {
+            background: rgba(0, 0, 0, 0.5);
+            color: #00ff00;
+            border-color: #00ff00;
+            box-shadow: none;
+        }
+        #camPad .icon-btn:active {
+            background: rgba(0, 255, 0, 0.25);
+        }
+
         .search-tab {
             flex: 1; padding: 6px 0; font-size: 12px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px 4px 0 0; cursor: pointer;
         }
