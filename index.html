@@ -155,6 +155,7 @@
         }
 
         #camIndicator {
+            display: none;/* 자동 AR에서만 표시 (test7.js openCam) */
             position: fixed;
             bottom: 10px; right: 10px;
             z-index: 999;
@@ -267,17 +268,19 @@
                     <path d="M320-120v-160h80v160h-80Zm0-280v-160h80v160h-80Zm0-280v-160h80v160h-80ZM80-120l100-720h80L160-120H80Zm598.5-3q-5.5-3-8.5-9l-4-9q-23-48-64-82.5T532-302q-17-26-25-55t-8-59q0-78 57-130.5T692-599q78 0 133 56t55 135q0 29-8 56t-24 50q-29 44-70.5 78.5T714-141l-4 9q-3 6-8.5 9t-11.5 3q-6 0-11.5-3Zm68-230.5Q770-377 770-410t-23.5-56.5Q723-490 690-490t-56.5 23.5Q610-443 610-410t23.5 56.5Q657-330 690-330t56.5-23.5ZM494-599l-34-241h80l26 187q-20 11-38 24t-34 30Z"/>
                 </svg>
             </button>
-            <button id="BtnOpenCam" onclick="openCam()" title="카메라 AR" class="icon-btn">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button id="BtnOpenCam" onclick="openCam()" title="카메라 AR (자동: GPS·나침반)" class="icon-btn" style="flex-direction:column; gap:0; line-height:1;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                    <text x="12" y="16" font-size="12" font-family="sans-serif" font-weight="900" fill="currentColor" stroke="none" text-anchor="middle">AR</text>
+                    <text x="12" y="14.5" dominant-baseline="central" font-size="11" font-family="sans-serif" font-weight="900" fill="currentColor" stroke="none" text-anchor="middle">AR</text>
                 </svg>
+                <span style="font-size:7px; font-weight:bold; letter-spacing:0.3px;">AUTO</span>
             </button>
-            <button id="BtnOpenManual" onclick="openCam(true)" title="수동 AR (GPS 1회, 미니맵으로 위치·방향 지정)" class="icon-btn">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button id="BtnOpenManual" onclick="openCam(true)" title="카메라 AR (수동: 미니맵으로 위치·방향)" class="icon-btn" style="flex-direction:column; gap:0; line-height:1;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                    <text x="12" y="16" font-size="11" font-family="sans-serif" font-weight="900" fill="currentColor" stroke="none" text-anchor="middle">M</text>
+                    <text x="12" y="14.5" dominant-baseline="central" font-size="11" font-family="sans-serif" font-weight="900" fill="currentColor" stroke="none" text-anchor="middle">AR</text>
                 </svg>
+                <span style="font-size:7px; font-weight:bold; letter-spacing:0.3px;">MANUAL</span>
             </button>
             <!-- 우측 상단 독립 닫기(X) 버튼들 -->
             <button id="BtnCloseRoad" class="icon-btn close-btn" onclick="closeRoad()" title="로드뷰 닫기" style="display: none;">&times;</button>

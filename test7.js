@@ -26,10 +26,10 @@ function openRoad(position) {
     cMode = "road";
     allNone();
     document.getElementById('roadBox').style.display = 'block';
-    document.getElementById('BtnCloseRoad').style.display = 'block';
+    document.getElementById('BtnCloseRoad').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
     roadFix = {east: 0, north: 0};// 열 때마다 초기화 (파노라마마다 위치 오차 다름)
     ensurePad();
-    document.getElementById("camPad").style.display = "grid";
+    padPlace(manualAR ? "left" : "center");// 수동 AR은 좌하단(미니맵이 우하단), 그 외 하단 중앙
     padInfo();
 
     roadView.relayout();// 지도의 크기를 변경하거나 숨김 상태에서 보인 직후에 호출
@@ -49,11 +49,11 @@ function closeRoad() {
     allNone();
     document.getElementById('map').style.display = 'block';
     document.getElementById('titleBar').style.display = 'flex';
-    document.getElementById('BtnSearch').style.display = 'block'; // 추가
-    document.getElementById('BtnMyLoc').style.display = 'block';
-    document.getElementById('BtnRoadMode').style.display = 'block';
-    document.getElementById('BtnOpenCam').style.display = 'block';
-    document.getElementById('BtnOpenManual').style.display = 'block';
+    document.getElementById('BtnSearch').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐) // 추가
+    document.getElementById('BtnMyLoc').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
+    document.getElementById('BtnRoadMode').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
+    document.getElementById('BtnOpenCam').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
+    document.getElementById('BtnOpenManual').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
 
     var pad = document.getElementById("camPad");
     if (pad) pad.style.display = "none";
@@ -163,10 +163,10 @@ async function openCam(manual) {// manual=true면 수동 AR
     }
     posFix = {east: 0, north: 0};// 열 때마다 초기화 (GPS 오차는 매번 다름). 방위 보정(headingFix)은 기기 고유라 유지
     ensurePad();
-    document.getElementById("camPad").style.display = "grid";
+    padPlace(manualAR ? "left" : "center");// 수동 AR은 좌하단(미니맵이 우하단), 그 외 하단 중앙
     padInfo();
-    document.getElementById("camPad").style.bottom = manualAR ? "180px" : "10px";// 수동이면 미니맵(170px) 위로
-    document.getElementById("camIndicator").style.bottom = manualAR ? "345px" : "175px";// 패드 위로
+    document.getElementById("camIndicator").style.display = manualAR ? "none" : "block";// 인디케이터는 자동 AR에서만
+    document.getElementById("camIndicator").style.bottom = "175px";// 패드 위로
 
     // 이전 상태 초기화
     cmaPos = null;
@@ -274,14 +274,14 @@ function closeCam() {
     allNone();
     document.getElementById('map').style.display = 'block';
     document.getElementById('titleBar').style.display = 'flex';
-    document.getElementById('BtnSearch').style.display = 'block'; // 추가
-    document.getElementById('BtnMyLoc').style.display = 'block';
-    document.getElementById('BtnRoadMode').style.display = 'block';
-    document.getElementById('BtnOpenCam').style.display = 'block';
-    document.getElementById('BtnOpenManual').style.display = 'block';
+    document.getElementById('BtnSearch').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐) // 추가
+    document.getElementById('BtnMyLoc').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
+    document.getElementById('BtnRoadMode').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
+    document.getElementById('BtnOpenCam').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
+    document.getElementById('BtnOpenManual').style.display = '';// 인라인 display 제거 → CSS .icon-btn의 flex 복원 (block이면 세로 배치 깨져 AUTO/MANUAL 글자 처짐)
     var pad = document.getElementById("camPad");
     if (pad) pad.style.display = "none";
-    document.getElementById("camIndicator").style.bottom = "10px";
+    document.getElementById("camIndicator").style.display = "none";
     miniHide();
     manualAR = false;
 
@@ -443,24 +443,20 @@ function manualStartAtMap() {
     miniShow();
 }
 
-// 미니맵 생성(1회)·표시. 위성(HYBRID) 레벨 1. 마커 드래그 = 내 위치, 지도 탭 = 그 지점을 보는 방위
+// 미니맵 생성(1회)·표시. 우하단 200×200, 위성(HYBRID) 레벨 1. 탭 = 그 지점으로 내 위치 이동, 드래그 = 마커에서 손가락 쪽을 보는 방위
 function miniShow() {
     if (!miniMap) {
         document.getElementById("box1").insertAdjacentHTML("beforeend",
-            '<div id="miniMap" style="position:fixed; left:0; bottom:0; width:100%; height:170px; z-index:998; border-top:2px solid #425470;"></div>');
+            '<div id="miniMap" style="position:fixed; right:10px; bottom:10px; width:200px; height:200px; z-index:998; border:2px solid #425470; border-radius:8px; overflow:hidden; touch-action:none;"></div>');
         var el = document.getElementById("miniMap");
         var start = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
         miniMap = new kakao.maps.Map(el, {center: start, level: 1, mapTypeId: kakao.maps.MapTypeId.HYBRID});
-        // 내 위치 마커: 파란 점, 드래그 가능
+        miniMap.setDraggable(false);// 지도 끌기 끔 (드래그는 방향 조작에 씀). 핀치 줌은 됨
+        // 내 위치 마커: 파란 점
         var dot = new kakao.maps.MarkerImage(
             'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#1E88E5" stroke="#fff" stroke-width="2"/></svg>'),
             new kakao.maps.Size(18, 18), {offset: new kakao.maps.Point(9, 9)});
-        miniMarker = new kakao.maps.Marker({position: start, image: dot, draggable: true, map: miniMap, zIndex: 10});
-        kakao.maps.event.addListener(miniMarker, 'drag', function() { miniArrow.setPosition(miniMarker.getPosition()); });
-        kakao.maps.event.addListener(miniMarker, 'dragend', function() {
-            var p = miniMarker.getPosition();
-            setManualPos(p.getLat(), p.getLng());
-        });
+        miniMarker = new kakao.maps.Marker({position: start, image: dot, map: miniMap, zIndex: 10});
         // 방향 화살표: 마커 위에 세워진 삼각형, 밑변 중앙을 축으로 heading만큼 회전
         miniArrow = new kakao.maps.CustomOverlay({
             position: start,
@@ -468,13 +464,30 @@ function miniShow() {
             xAnchor: 0.5, yAnchor: 1, zIndex: 5
         });
         miniArrow.setMap(miniMap);
-        // 지도 탭 = 내 위치에서 그 지점을 보는 방위
-        kakao.maps.event.addListener(miniMap, 'click', function(e) {
-            var p = miniMarker.getPosition();
-            var east = (e.latLng.getLng() - p.getLng()) * 111320 * Math.cos(p.getLat() * RAD);
-            var north = (e.latLng.getLat() - p.getLat()) * 111320;
-            setManualHeading(Math.atan2(east, north) * DEG);
+        // 조작: 포인터 이벤트로 직접 처리. 6px 미만 = 탭(위치 이동), 그 이상 = 드래그(방향). 두 번째 손가락 오면 취소(핀치)
+        var ptr = null;// {id, x, y, moved}
+        function pt(e) { var r = el.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+        el.addEventListener("pointerdown", function(e) {
+            if (ptr) { ptr = null; return; }
+            var p = pt(e);
+            ptr = {id: e.pointerId, x: p.x, y: p.y, moved: false};
         });
+        el.addEventListener("pointermove", function(e) {
+            if (!ptr || e.pointerId !== ptr.id) return;
+            var p = pt(e);
+            if (!ptr.moved && Math.hypot(p.x - ptr.x, p.y - ptr.y) < 6) return;
+            ptr.moved = true;
+            miniAim(p.x, p.y);
+        });
+        el.addEventListener("pointerup", function(e) {
+            if (!ptr || e.pointerId !== ptr.id) return;
+            if (!ptr.moved) {
+                var ll = miniMap.getProjection().coordsFromContainerPoint(new kakao.maps.Point(ptr.x, ptr.y));
+                setManualPos(ll.getLat(), ll.getLng());
+            }
+            ptr = null;
+        });
+        el.addEventListener("pointercancel", function() { ptr = null; });
     } else {
         document.getElementById("miniMap").style.display = "block";
         miniMap.relayout();
@@ -489,18 +502,27 @@ function miniHide() {
     if (el) el.style.display = "none";
 }
 
-// 미니맵 마커·화살표를 cmaPos로 (패드 보정 뒤 등)
+// 미니맵 마커·화살표·지도 중심을 cmaPos로 (탭 이동, 패드 보정 뒤)
 function miniSync() {
     if (!miniMarker || !cmaPos) return;
     var p = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
     miniMarker.setPosition(p);
     miniArrow.setPosition(p);
+    miniMap.setCenter(p);// 내 위치가 항상 미니맵 중앙. 탭·패드로 옮기면 지도가 따라와 범위 제한 없음
 }
 
 // 화살표를 현재 방위로 회전 (CSS rotate는 시계방향 = 방위와 같음)
 function miniArrowUpdate() {
     var el = document.getElementById("miniArrowEl");
     if (el && heading != null) el.style.transform = "rotate(" + heading.toFixed(1) + "deg)";
+}
+
+// 미니맵 컨테이너 px (x, y) 쪽을 보는 방위로. 마커의 화면 위치 기준. 지도는 북쪽이 위라 화면 -y = 북
+function miniAim(x, y) {
+    var mp = miniMap.getProjection().containerPointFromCoords(miniMarker.getPosition());
+    var dx = x - mp.x, dy = y - mp.y;
+    if (Math.hypot(dx, dy) < 4) return;// 마커 바로 위는 방향 불명
+    setManualHeading(Math.atan2(dx, -dy) * DEG);
 }
 
 // 다시 그릴지 결정하는 공통 입구. 센서(camEvent)와 GPS(setGps), 보정 버튼 모두 여기로 들어옴.
@@ -598,10 +620,19 @@ function ensurePad() {
         '<div id="padInfo" style="grid-column:1/4; font-size:11px; color:#fff; background:rgba(0,0,0,0.5); padding:2px 6px; border-radius:4px; white-space:nowrap;"></div>' +
         '<span></span><button class="icon-btn" onclick="padNudge(0,1)" title="내 위치 북쪽 1m">▲</button><span></span>' +
         '<button class="icon-btn" onclick="padNudge(-1,0)" title="내 위치 서쪽 1m">◀</button>' +
-        '<button class="icon-btn" onclick="padReset()" title="보정 초기화" style="font-size:12px;">0</button>' +
+        '<button class="icon-btn" onclick="padReset()" title="보정 초기화" style="font-size:9px; font-weight:bold;">RESET</button>' +
         '<button class="icon-btn" onclick="padNudge(1,0)" title="내 위치 동쪽 1m">▶</button>' +
         '<span></span><button class="icon-btn" onclick="padNudge(0,-1)" title="내 위치 남쪽 1m">▼</button><span></span>' +
         '</div>');
+}
+
+// 패드 위치: center = 하단 중앙(자동 AR·로드뷰), left = 좌하단(수동 AR, 미니맵이 우하단)
+function padPlace(side) {
+    var pad = document.getElementById("camPad");
+    pad.style.display = "grid";
+    pad.style.bottom = "10px";
+    pad.style.left = side === "left" ? "10px" : "50%";
+    pad.style.transform = side === "left" ? "none" : "translateX(-50%)";
 }
 
 // 패드 버튼: 모드에 따라 카메라(posFix) 또는 로드뷰(roadFix) 보정
