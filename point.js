@@ -136,7 +136,7 @@ function mapMH() {
             position: mh.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.2
+            yAnchor: 0.3
         });
 
         customOverlay.setMap(map);
@@ -360,7 +360,7 @@ function mapHDH() {
     mapHDH_Over = [];
 
     if (!showLayer.HDH) return;// 설정에서 숨김 (index.html showLayer)
-    if (map.getLevel() > 3) return;
+    if (map.getLevel() > 2) return;
 
     HDH_all.forEach(function(HDH) {
         if (!mapBounds.contain(HDH.position)) return;
@@ -378,7 +378,7 @@ function mapHDH() {
             position: HDH.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.5
+            yAnchor: 0.3
         });
 
         customOverlay.setMap(map);
@@ -594,7 +594,7 @@ function mapMCR() {
     mapMCR_Over = [];
 
     if (!showLayer.MCR) return;// 설정에서 숨김 (index.html showLayer)
-    if (map.getLevel() > 3) return;
+    if (map.getLevel() > 2) return;
     var mapBounds = map.getBounds();
 
     MCR_all.forEach(function(MCR) {
@@ -612,7 +612,7 @@ function mapMCR() {
             position: MCR.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.8
+            yAnchor: 0.7
         });
 
         customOverlay.setMap(map);
@@ -845,7 +845,7 @@ function mapETC() {
             position: ETC.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.2
+            yAnchor: 0.3
         });
 
         customOverlay.setMap(map);

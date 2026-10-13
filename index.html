@@ -566,7 +566,7 @@ function openSettingsModal() {
     document.getElementById('chkMCR').checked = showLayer.MCR;
     document.getElementById('gradeLegend').innerHTML = Object.keys(GRADE_COLORS).map(function(g) {
         return '<span style="color:' + GRADE_COLORS[g] + '">■</span> ' + g + '등급';
-    }).join('&nbsp;&nbsp;') + '&nbsp;&nbsp;<span style="color:#888888">■</span> 미상 (해제 시 S=빨강, R=주황)';
+    }).join('&nbsp;&nbsp;') + '&nbsp;&nbsp;<span style="color:#888888">■</span> 미상<br>해제 시 S=빨강, R=주황';
     document.getElementById('SettingsModal').style.display = 'flex';
 }
 
