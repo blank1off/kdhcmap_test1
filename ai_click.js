@@ -105,6 +105,7 @@ function infoOf(type, it) {
                 <b>기계실 위치:</b> ${it.roomLc || '-'}<br>
                 <b>밸브 위치:</b> ${it.valveLc || '-'}<br>
                 <b>밸브 형태:</b> ${it.valveKey || '-'}<br>
+                <b>연락처:</b>'-'<br>
             `};
         case "ETC": return {
             title: `${it.NAME}`,

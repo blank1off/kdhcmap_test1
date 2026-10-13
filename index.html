@@ -23,7 +23,7 @@
             gap: 8px;
             padding: 0 10px;
             box-sizing: border-box;
-            background: #425470;
+            background: #ff0000;
             color: #fff;
         }
         #titleText {
@@ -226,7 +226,7 @@
 
         /* 로드뷰 모드가 켜졌을 때 활성화 스타일 (배경색 & 글자/아이콘색 반전) */
         .icon-btn.selected_btn {
-            background: #425470;
+            background: #3396FF;
             color: #ffffff;
             border-color: #31415a;
         }
@@ -303,7 +303,7 @@
             <button id="BtnCloseRoad" class="icon-btn close-btn" onclick="closeRoad()" title="로드뷰 닫기" style="display: none;">&times;</button>
             <button id="BtnCloseCam" class="icon-btn close-btn" onclick="closeCam()" title="카메라 닫기" style="display: none;">&times;</button>
             
-            <input type="file" id="csvFile" accept=".csv">
+            <!-- <input type="file" id="csvFile" accept=".csv"> -->
         </div>
         <div id="map"></div>
         <div id="roadBox">
@@ -383,7 +383,7 @@
     var camView;
     var camSVG;
 
-    // ★ 데이터 불러오기 중요 로컬에서 임시로 사용
+    /*// ★ 데이터 불러오기 중요 로컬에서 임시로 사용
     const fileInput = document.getElementById('csvFile');
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -400,7 +400,7 @@
             mapUpdate();
         };
         reader.readAsText(file, 'utf-8');
-    });
+    });*/
     
     kakao.maps.load(function() {
         // 저장된 이전 위치 데이터 가져오기 (없을 경우 기본값: 분당 중심)
@@ -555,98 +555,6 @@
         }
     }
 
-/*var currentSearchTab = 'keyword'; // 기본값: 일반검색
-var ps = new kakao.maps.services.Places(); // 카카오 장소 검색 객체
-
-// 모달 열기/닫기
-function openSearchModal() {
-    if (cMode !== "map") return;
-    document.getElementById('SearchModal').style.display = 'flex';
-    document.getElementById('searchInput').focus();
-}
-
-function closeSearchModal() {
-    document.getElementById('SearchModal').style.display = 'none';
-}
-
-// 탭 전환
-function switchSearchTab(tabType, btnElement) {
-    currentSearchTab = tabType;
-    var tabs = document.querySelectorAll('.search-tab');
-    tabs.forEach(t => t.classList.remove('active'));
-    btnElement.classList.add('active');
-    
-    // 검색창 초기화
-    document.getElementById('searchInput').value = '';
-    document.getElementById('searchResults').innerHTML = '<div style="color:#888; text-align:center; padding:20px 0;">검색어를 입력해주세요.</div>';
-}
-
-// 검색 실행
-function executeSearch() {
-    var keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-    if (!keyword) {
-        alert("검색어를 입력하세요.");
-        return;
-    }
-
-    var resultBox = document.getElementById('searchResults');
-    resultBox.innerHTML = '';
-
-    if (currentSearchTab === 'keyword') {
-        // 1. 카카오 키워드 일반 검색
-        ps.keywordSearch(keyword, function(data, status) {
-            if (status === kakao.maps.services.Status.OK) {
-                data.forEach(place => {
-                    var div = document.createElement('div');
-                    div.className = 'search-item';
-                    div.innerHTML = `<b>${place.place_name}</b><br><span style="font-size:11px; color:#666;">${place.address_name}</span>`;
-                    div.onclick = function() {
-                        var moveLatLon = new kakao.maps.LatLng(place.y, place.x);
-                        map.setCenter(moveLatLon);
-                        map.setLevel(3);
-                        closeSearchModal();
-                    };
-                    resultBox.appendChild(div);
-                });
-            } else {
-                resultBox.innerHTML = '<div style="color:#888; text-align:center; padding:20px 0;">검색 결과가 없습니다.</div>';
-            }
-        });
-    } else {
-        // 2. 내부 데이터 검색 (맨홀, 핸드홀, 기계실)
-        var list = [];
-        if (currentSearchTab === 'mh') list = MH_all;
-        else if (currentSearchTab === 'hdh') list = HDH_all;
-        else if (currentSearchTab === 'mcr') list = MCR_all;
-
-        var matches = list.filter(item => {
-            var searchTarget = (item.name || '') + ' ' + (item.buildName || '') + ' ' + (item.roomName || '') + ' ' + (item.buildId || '');
-            return searchTarget.toLowerCase().includes(keyword);
-        });
-
-        if (matches.length === 0) {
-            resultBox.innerHTML = '<div style="color:#888; text-align:center; padding:20px 0;">검색 결과가 없습니다.</div>';
-            return;
-        }
-
-        matches.forEach(item => {
-            var div = document.createElement('div');
-            div.className = 'search-item';
-            
-            var title = item.name || `${item.buildName}(${item.roomName})`;
-            var subText = item.lc || item.valveLc || `고도: ${item.alt || 0}m`;
-
-            div.innerHTML = `<b>${title}</b><br><span style="font-size:11px; color:#666;">${subText}</span>`;
-            div.onclick = function() {
-                map.setCenter(item.position);
-                map.setLevel(2); // 상세 위치 확인용 레벨 조절
-                closeSearchModal();
-                mapUpdate();
-            };
-            resultBox.appendChild(div);
-        });
-    }
-}*/
 // 설비 종류별 표시 여부 (point.js map*/road*/cam*, ai_click.js가 참조). 기본 모두 표시
 var showLayer = {MH: true, HDH: true, MCR: true};
 
@@ -706,94 +614,6 @@ function switchSearchTab(tabType, btnElement) {
     document.getElementById('searchInput').value = '';
     document.getElementById('searchResults').innerHTML = '<div style="color:#888; text-align:center; padding:20px 0; font-size:12px;">검색어를 입력해주세요.</div>';
 }
-
-/*function executeSearch() {
-    var keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-    if (!keyword) {
-        alert("검색어를 입력하세요.");
-        return;
-    }
-
-    var resultBox = document.getElementById('searchResults');
-    resultBox.innerHTML = '';
-
-    // 1. 일반 키워드 검색 (카카오 지도 장소 검색 API)
-    if (currentSearchTab === 'keyword') {
-        if (!ps) {
-            if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.services) {
-                ps = new kakao.maps.services.Places();
-            } else {
-                alert("카카오 장소 검색 라이브러리가 로드되지 않았습니다.\nscript 태그의 &libraries=services 설정을 확인하세요.");
-                return;
-            }
-        }
-
-        ps.keywordSearch(keyword, function(data, status) {
-            if (status === kakao.maps.services.Status.OK) {
-                data.forEach(function(place) {
-                    var div = document.createElement('div');
-                    div.className = 'search-item';
-                    div.innerHTML = `<b>${place.place_name}</b><br><span style="color:#666;">${place.address_name || place.road_address_name}</span>`;
-                    
-                    div.onclick = function() {
-                        var moveLatLon = new kakao.maps.LatLng(place.y, place.x);
-                        map.setCenter(moveLatLon);
-                        map.setLevel(3);
-                        closeSearchModal();
-                        mapUpdate();
-                    };
-                    resultBox.appendChild(div);
-                });
-            } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
-                resultBox.innerHTML = '<div style="color:#888; text-align:center; padding:20px 0; font-size:12px;">검색 결과가 없습니다.</div>';
-            } else {
-                resultBox.innerHTML = '<div style="color:#e53e3e; text-align:center; padding:20px 0; font-size:12px;">검색 중 오류가 발생했습니다.</div>';
-            }
-        });
-    } 
-    // 2. 내부 파일 데이터 검색 (맨홀, 핸드홀, 기계실)
-    else {
-        var list = [];
-        if (currentSearchTab === 'mh') list = MH_all;
-        else if (currentSearchTab === 'hdh') list = HDH_all;
-        else if (currentSearchTab === 'mcr') list = MCR_all;
-
-        var matches = list.filter(function(item) {
-            var searchTarget = [
-                item.name, 
-                item.buildName, 
-                item.roomName, 
-                item.buildId, 
-                item.lc
-            ].join(' ').toLowerCase();
-            
-            return searchTarget.indexOf(keyword) !== -1;
-        });
-
-        if (matches.length === 0) {
-            resultBox.innerHTML = '<div style="color:#888; text-align:center; padding:20px 0; font-size:12px;">검색 결과가 없습니다.</div>';
-            return;
-        }
-
-        matches.forEach(function(item) {
-            var div = document.createElement('div');
-            div.className = 'search-item';
-            
-            var title = item.name || `${item.buildName}(${item.roomName})`;
-            var subText = item.lc || item.valveLc || `건물ID: ${item.buildId || '-'}`;
-
-            div.innerHTML = `<b>${title}</b><br><span style="color:#666;">${subText}</span>`;
-            
-            div.onclick = function() {
-                map.setCenter(item.position);
-                map.setLevel(2);
-                closeSearchModal();
-                mapUpdate();
-            };
-            resultBox.appendChild(div);
-        });
-    }
-}*/
 
 function executeSearch() {
     var keyword = document.getElementById('searchInput').value.trim().toLowerCase();

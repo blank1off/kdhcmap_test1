@@ -159,7 +159,7 @@ async function openCam(manual) {// manual=true면 수동 AR
             '<div>GPS : <span id="indGps">-</span></div>' +
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
-        document.getElementById("camBox").addEventListener("click", camTap);
+        //삭제 document.getElementById("camBox").addEventListener("click", camTap);
     }
     posFix = {east: 0, north: 0};// 열 때마다 초기화 (GPS 오차는 매번 다름). 방위 보정(headingFix)은 기기 고유라 유지
     ensurePad();
@@ -447,14 +447,14 @@ function manualStartAtMap() {
 function miniShow() {
     if (!miniMap) {
         document.getElementById("box1").insertAdjacentHTML("beforeend",
-            '<div id="miniMap" style="position:fixed; left:10px; bottom:10px; width:200px; height:200px; z-index:998; border:2px solid #425470; border-radius:8px; overflow:hidden; touch-action:none;"></div>');
+            '<div id="miniMap" style="position:fixed; left:10px; bottom:10px; width:200px; height:200px; z-index:998; border:2px solid #00ff00; border-radius:8px; overflow:hidden; touch-action:none;"></div>');
         var el = document.getElementById("miniMap");
         var start = new kakao.maps.LatLng(cmaPos.lat, cmaPos.lng);
         miniMap = new kakao.maps.Map(el, {center: start, level: 1, mapTypeId: kakao.maps.MapTypeId.HYBRID});
         miniMap.setDraggable(false);// 지도 끌기 끔 (드래그는 방향 조작에 씀). 핀치 줌은 됨
         // 상단 안내 문구 (클릭 안 가로챔)
         el.insertAdjacentHTML("beforeend",
-            '<div style="position:absolute; top:0; left:0; right:0; z-index:100; font-size:10px; font-family:monospace; color:#00ff00; background:rgba(0,0,0,0.6); text-align:center; padding:2px 0; pointer-events:none;">탭 = 위치 이동 · 드래그 = 보는 방향</div>');
+            '<div style="position:absolute; top:0; left:0; right:0; z-index:100; font-size:10px; font-family:monospace; color:#00ff00; background:rgba(0,0,0,0.6); text-align:center; padding:2px 0; pointer-events:none;">탭 = 위치이동 · 드래그 = 방향전환</div>');
         // 내 위치 마커: 파란 점
         var dot = new kakao.maps.MarkerImage(
             'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#1E88E5" stroke="#fff" stroke-width="2"/></svg>'),
@@ -591,7 +591,7 @@ function drawCam() {
 }
 
 
-// 화면에서 실제 맨홀 위치를 탭 → 가장 가까운 마커가 그 자리에 오도록 수동 방위 보정(headingFix)
+/*// 화면에서 실제 맨홀 위치를 탭 → 가장 가까운 마커가 그 자리에 오도록 수동 방위 보정(headingFix)
 function camTap(ev) {
     if (cMode !== "cam" || !camRot || !cmaPos || !lastDraw || !drawn.length) return;// 그려진 마커 없으면 기준 없음
     var d = lastDraw;// 마지막 그리기의 투영 파라미터
@@ -612,7 +612,7 @@ function camTap(ev) {
     if (manualAR) { setManualHeading(heading + wrap180(brg - tapHead)); return; }// 수동: 미니맵 방위를 그만큼 돌림 (저장 안 함)
     headingFix = wrap180(headingFix + wrap180(brg - tapHead));// 실제 방위 - 추정 방위 만큼 누적 보정
     localStorage.setItem("headingFix", headingFix);// 나침반 편차는 기기 고유라 저장
-}
+}*/
 
 // ───────── 보정 패드 (카메라·로드뷰 공용) ─────────
 // 4방향 = "내 위치"를 동/서/남/북 1m 이동, 중앙 = 초기화. 하단 중앙. camBox 밖(box1)에 둬야 탭이 camTap으로 안 감
@@ -662,7 +662,7 @@ function padReset() {
 function padInfo() {
     var f = cMode === "road" ? roadFix : posFix;
     document.getElementById("padInfo").textContent =
-        "내 위치 보정 동 " + f.east + "m 북 " + f.north + "m" + (cMode === "cam" ? " (0 = 방위+위치 초기화)" : "");
+        "세부보정 위도" + f.north + "m 경도" + f.east + "m";
 }
 
 // 로드뷰 오버레이 좌표에 수동 보정 적용. "내 위치를 동/북으로 옮김" = 설비를 반대로 옮김 (파노라마 자체는 못 옮기므로)
@@ -833,4 +833,4 @@ function getPointAtRatio(pos1, pos2, ratio) {
     var lng = lng1 + (lng2 - lng1) * ratio;
 
     return new kakao.maps.LatLng(lat, lng);
-}
+}
