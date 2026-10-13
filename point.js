@@ -136,7 +136,7 @@ function mapMH() {
             position: mh.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.5
+            yAnchor: 0.2
         });
 
         customOverlay.setMap(map);
@@ -604,15 +604,15 @@ function mapMCR() {
         contentDiv.className = 'overlay1';
 
         contentDiv.innerHTML = `
-            <img class="icon1" src="icon/MCR.png" alt="기계실">
             <span class="label1">${MCR.buildName}(${MCR.roomName})</span>
+            <img class="icon1" src="icon/MCR.png" alt="기계실">
         `;
 
         var customOverlay = new kakao.maps.CustomOverlay({
             position: MCR.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.5
+            yAnchor: 0.8
         });
 
         customOverlay.setMap(map);
@@ -845,7 +845,7 @@ function mapETC() {
             position: ETC.position,
             content: contentDiv,
             xAnchor: 0.5,
-            yAnchor: 0.5
+            yAnchor: 0.2
         });
 
         customOverlay.setMap(map);
