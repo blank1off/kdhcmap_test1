@@ -823,7 +823,7 @@ function parseFullCSV(csvText) {
     return rows;
 }
 
-function parseETC(csvText) {
+/*function parseETC(csvText) {
     ETC_all = [];
 
     //var lines = csvText.trim().split(/\r?\n/);
@@ -861,7 +861,70 @@ function parseETC(csvText) {
         }
     }
     mapETC();
+}*/
+
+
+function parseETC(csvText) {
+    ETC_all = [];
+
+    var lines = csvText.replace(/^\uFEFF/, '').split(/\r?\n/);
+    var currentETC = null;
+
+    for (var i = 1; i < lines.length; i++) {
+        var line = lines[i];
+
+        if (line.trim() === '') {
+            // 빈 줄도 설명의 일부로 보존
+            if (currentETC) {
+                currentETC.ETC1 += '\n';
+            }
+            continue;
+        }
+
+        // 첫 4개 쉼표를 기준으로 위치 정보와 설명을 분리
+        var columns = line.split(',', 5);
+
+        var type = columns[0] ? columns[0].trim() : '';
+        var name = columns[1] ? columns[1].trim() : '';
+        var lat = columns[2] ? parseFloat(columns[2].trim()) : NaN;
+        var lng = columns[3] ? parseFloat(columns[3].trim()) : NaN;
+
+        // 분류, 이름, 위도, 경도가 있는 행이면 새 설비
+        var isNewETC =
+            type !== '' &&
+            name !== '' &&
+            Number.isFinite(lat) &&
+            Number.isFinite(lng) &&
+            lat !== 0 &&
+            lng !== 0;
+
+        if (isNewETC) {
+            currentETC = {
+                TYPE: type,
+                NAME: name,
+                ETC1: columns[4] || '',
+                ETC2: '',
+                ETC3: '',
+                position: new kakao.maps.LatLng(lat, lng)
+            };
+
+            ETC_all.push(currentETC);
+        } else if (currentETC) {
+            // 후속 설명 행을 기존 특성1에 그대로 연결
+            if (currentETC.ETC1 !== '') {
+                currentETC.ETC1 += '\n';
+            }
+
+            currentETC.ETC1 += line;
+        }
+    }
+
+    console.log('ETC 전체 개수:', ETC_all.length);
+    console.log('ETC 데이터:', ETC_all);
+
+    mapETC();
 }
+
 
 function mapETC() {
     for (var i = 0; i < mapETC_Over.length; i++) {
