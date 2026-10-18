@@ -781,6 +781,48 @@ function loadETC(filePath) {
         });
 }
 
+// 1. 큰따옴표 내부 개행(\n)을 보존하는 올바른 CSV 전체 파싱 함수
+function parseFullCSV(csvText) {
+    var rows = [];
+    var currentRow = [];
+    var currentCell = '';
+    var inQuotes = false;
+
+    for (var i = 0; i < csvText.length; i++) {
+        var ch = csvText[i];
+        var nextCh = csvText[i + 1];
+
+        if (ch === '"') {
+            if (inQuotes && nextCh === '"') { // 이중 따옴표("") 처리
+                currentCell += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes; // 따옴표 열림/닫힘 상태 전환
+            }
+        } else if (ch === ',' && !inQuotes) {
+            currentRow.push(currentCell.trim());
+            currentCell = '';
+        } else if ((ch === '\r' || ch === '\n') && !inQuotes) {
+            if (ch === '\r' && nextCh === '\n') { i++; } // \r\n 처리
+            currentRow.push(currentCell.trim());
+            if (currentRow.length > 0 && currentRow.some(c => c !== '')) {
+                rows.push(currentRow);
+            }
+            currentRow = [];
+            currentCell = '';
+        } else {
+            currentCell += ch;
+        }
+    }
+
+    if (currentCell !== '' || currentRow.length > 0) {
+        currentRow.push(currentCell.trim());
+        rows.push(currentRow);
+    }
+
+    return rows;
+}
+
 function parseETC(csvText) {
     ETC_all = [];
 
