@@ -113,11 +113,6 @@ function infoOf(type, it) {
             title: `${it.NAME}`,
             body: `
                 <pre style="
-                    margin-top: 6px;
-                    padding: 10px;
-                    background-color: #f8f9fa;
-                    border: 1px solid #e9ecef;
-                    border-radius: 6px;
                     font-size: 13px;
                     font-family: inherit;      /* 기본 글꼴 상속 (고정폭 폰트 해제) */
                     line-height: 1.5;

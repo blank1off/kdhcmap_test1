@@ -784,7 +784,8 @@ function loadETC(filePath) {
 function parseETC(csvText) {
     ETC_all = [];
 
-    var lines = csvText.trim().split(/\r?\n/);
+    //var lines = csvText.trim().split(/\r?\n/);
+    var lines = parseFullCSV(csvText);
     if (lines.length <= 1) return;
 
     for (var i = 1; i < lines.length; i++) {
