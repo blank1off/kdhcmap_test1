@@ -156,7 +156,7 @@ function roadMH() {
             MH_roadCachePos.lat, MH_roadCachePos.lng,
             currentLat, currentLng
         );
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -165,8 +165,8 @@ function roadMH() {
         MH_roadCachePos = { lat: currentLat, lng: currentLng };
         MH_roadOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         MH_all.forEach(function(mh) {
             var pos = mh.position;
@@ -223,7 +223,7 @@ function camMH() {
             MH_camCachePos.lat, MH_camCachePos.lng,
             currentLat, currentLng
         );
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -232,8 +232,8 @@ function camMH() {
         MH_camCachePos = { lat: currentLat, lng: currentLng };
         MH_camOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         MH_all.forEach(function(mh) {
             var pos = mh.position;
@@ -398,7 +398,7 @@ function roadHDH() {
             HDH_roadCachePos.lat, HDH_roadCachePos.lng,
             currentLat, currentLng
         );
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -407,8 +407,8 @@ function roadHDH() {
         HDH_roadCachePos = { lat: currentLat, lng: currentLng };
         HDH_roadOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         HDH_all.forEach(function(HDH) {
             var pos = HDH.position;
@@ -466,7 +466,7 @@ function camHDH() {
             HDH_camCachePos.lat, HDH_camCachePos.lng,
             currentLat, currentLng
         );
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -475,8 +475,8 @@ function camHDH() {
         HDH_camCachePos = { lat: currentLat, lng: currentLng };
         HDH_camOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         HDH_all.forEach(function(HDH) {
             var pos = HDH.position;
@@ -632,7 +632,7 @@ function roadMCR() {
             MCR_roadCachePos.lat, MCR_roadCachePos.lng,
             currentLat, currentLng
         );
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -641,8 +641,8 @@ function roadMCR() {
         MCR_roadCachePos = { lat: currentLat, lng: currentLng };
         MCR_roadOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         MCR_all.forEach(function(MCR) {
             var pos = MCR.position;
@@ -699,7 +699,7 @@ function camMCR() {
             MCR_camCachePos.lat, MCR_camCachePos.lng,
             currentLat, currentLng
         );
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -708,8 +708,8 @@ function camMCR() {
         MCR_camCachePos = { lat: currentLat, lng: currentLng };
         MCR_camOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         MCR_all.forEach(function(MCR) {
             var pos = MCR.position;

@@ -218,7 +218,7 @@ function roadPPG(){
     var needRecache = true;
     if (PPG_roadCachePos) {
         var movedDist = getDistanceMeter(PPG_roadCachePos.lat, PPG_roadCachePos.lng, roadLat, roadLng);
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -227,8 +227,8 @@ function roadPPG(){
         PPG_roadCachePos = { lat: roadLat, lng: roadLng };
         PPG_roadOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(roadLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(roadLat * Math.PI / 180));
 
         var searchBounds = new kakao.maps.LatLngBounds(
             new kakao.maps.LatLng(roadLat - latDelta, roadLng - lngDelta),
@@ -418,11 +418,11 @@ function camPPG() {
     var currentLat = cmaPos.lat;
     var currentLng = cmaPos.lng;
 
-    // 1. 30m 이동 여부 확인 및 60m 캐시 바운딩 영역 생성 (roadPPG와 동일)
+    // 1. 50m 이동 여부 확인 및 100m 캐시 바운딩 영역 생성 (roadPPG와 동일)
     var needRecache = true;
     if (PPG_camCachePos) {
         var movedDist = getDistanceMeter(PPG_camCachePos.lat, PPG_camCachePos.lng, currentLat, currentLng);
-        if (movedDist < 30) {
+        if (movedDist < 50) {
             needRecache = false;
         }
     }
@@ -431,8 +431,8 @@ function camPPG() {
         PPG_camCachePos = { lat: currentLat, lng: currentLng };
         PPG_camOn = [];
 
-        var latDelta = 60 / 111320;
-        var lngDelta = 60 / (111320 * Math.cos(currentLat * Math.PI / 180));
+        var latDelta = 100 / 111320;
+        var lngDelta = 100 / (111320 * Math.cos(currentLat * Math.PI / 180));
 
         var searchBounds = new kakao.maps.LatLngBounds(
             new kakao.maps.LatLng(currentLat - latDelta, currentLng - lngDelta),

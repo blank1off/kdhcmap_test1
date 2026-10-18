@@ -1,7 +1,7 @@
 var mapBounds;
 
 var roadUpdateTimer = null;
-var roadMaxD = 30;
+var roadMaxD = 50;
 var ROAD_ALTITUDE = -1;// 로드뷰 오버레이 높이(m). +가 위. 현장 시험: -5 땅속, +5 하늘, -2.4~-1 사이가 뚜껑 근처. 0 기준이 수평선은 아닌 듯(API가 카메라 높이 일부 처리)
 var roadFix = {east: 0, north: 0};// 로드뷰 수동 위치 보정(m). 패드 버튼으로 1m씩. 파노라마 위치 오차 맞추기용. 세션 동안 유지, 중앙 버튼으로 초기화
 var roadPos;
@@ -124,7 +124,7 @@ var REDRAW_DIST = 1;// 내 위치가 이만큼(m) 이상 움직여야 다시 그
 var CAMERA_FOV = 69;// 카메라 화각(°, 영상 긴 변 기준). 보통 65~75. 마커 간격이 실제보다 좁거나 넓으면 조정
 var CAMERA_HEIGHT = 1.5;// 카메라 높이(m). 맨홀은 지면이라 이만큼 아래에 그림
 var MAG_DECLINATION = -8.7;// 자기 편각(°). 분당 2026년 약 -8.7(서편각)
-var camDistance = 30;// 표시 범위(m)
+var camDistance = 50;// 표시 범위(m)
 
 // 수동 AR: GPS는 열 때 1번만, 방위는 나침반 대신 미니맵(탭한 방향) + 자이로 상대 회전. 센서 없는 PC에서도 동작
 var manualAR = false;// 수동 AR 모드 여부 (openCam(true))
@@ -152,7 +152,7 @@ async function openCam(manual) {// manual=true면 수동 AR
 
     if (camSVG) camSVG.replaceChildren();// SVG 초기화
 
-    // 시험용 인디케이터 행 + 보정 초기화 버튼 + 탭 보정 (index.html 수정 없이)
+    /*// 시험용 인디케이터 행 + 보정 초기화 버튼 + 탭 보정 (index.html 수정 없이)
     if (!document.getElementById("indMe")) {
         document.getElementById("camIndicator").insertAdjacentHTML("beforeend",
             '<div>SRC : <span id="indSrc">-</span></div>' +
@@ -160,13 +160,13 @@ async function openCam(manual) {// manual=true면 수동 AR
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
         //삭제 document.getElementById("camBox").addEventListener("click", camTap);
-    }
+    }*/
     posFix = {east: 0, north: 0};// 열 때마다 초기화 (GPS 오차는 매번 다름). 방위 보정(headingFix)은 기기 고유라 유지
     ensurePad();
     padPlace(manualAR ? "right" : "center");// 수동 AR은 우하단(미니맵이 좌하단), 그 외 하단 중앙
     padInfo();
-    document.getElementById("camIndicator").style.display = manualAR ? "none" : "block";// 인디케이터는 자동 AR에서만
-    document.getElementById("camIndicator").style.bottom = "175px";// 패드 위로
+    //document.getElementById("camIndicator").style.display = manualAR ? "none" : "block";// 인디케이터는 자동 AR에서만
+    //document.getElementById("camIndicator").style.bottom = "175px";// 패드 위로
 
     // 이전 상태 초기화
     cmaPos = null;
