@@ -112,7 +112,21 @@ function infoOf(type, it) {
         case "ETC": return {
             title: `${it.NAME}`,
             body: `
-                <b>특성:</b> ${it.ETC1 || '-'}<br>
+                <b>세부설명:</b>
+                <pre style="
+                    margin-top: 6px;
+                    padding: 10px;
+                    background-color: #f8f9fa;
+                    border: 1px solid #e9ecef;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    font-family: inherit;      /* 기본 글꼴 상속 (고정폭 폰트 해제) */
+                    line-height: 1.5;
+                    max-height: 200px;         /* 높이 제한 및 스크롤 생성 */
+                    overflow-y: auto;
+                    white-space: pre-wrap;     /* ★ 개행 유지 + 긴 문장 자동 줄바꿈 */
+                    word-break: break-all;     /* 영역 뚫림 방지 */
+                ">${it.ETC1 || '-'}</pre>
             `};
         case "PPG": return {
             title: `${it.LINE_NM} (${it.srCode || '-'})`,
