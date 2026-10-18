@@ -152,7 +152,7 @@ async function openCam(manual) {// manual=true면 수동 AR
 
     if (camSVG) camSVG.replaceChildren();// SVG 초기화
 
-    /*// 시험용 인디케이터 행 + 보정 초기화 버튼 + 탭 보정 (index.html 수정 없이)
+    // 시험용 인디케이터 행 + 보정 초기화 버튼 + 탭 보정 (index.html 수정 없이)
     if (!document.getElementById("indMe")) {
         document.getElementById("camIndicator").insertAdjacentHTML("beforeend",
             '<div>SRC : <span id="indSrc">-</span></div>' +
@@ -160,13 +160,13 @@ async function openCam(manual) {// manual=true면 수동 AR
             '<div>ME : <span id="indMe">-</span></div>' +
             '<div>VIEW : <span id="indView">-</span></div>');
         //삭제 document.getElementById("camBox").addEventListener("click", camTap);
-    }*/
+    }
     posFix = {east: 0, north: 0};// 열 때마다 초기화 (GPS 오차는 매번 다름). 방위 보정(headingFix)은 기기 고유라 유지
     ensurePad();
     padPlace(manualAR ? "right" : "center");// 수동 AR은 우하단(미니맵이 좌하단), 그 외 하단 중앙
     padInfo();
     //document.getElementById("camIndicator").style.display = manualAR ? "none" : "block";// 인디케이터는 자동 AR에서만
-    //document.getElementById("camIndicator").style.bottom = "175px";// 패드 위로
+    document.getElementById("camIndicator").style.bottom = "175px";// 패드 위로
 
     // 이전 상태 초기화
     cmaPos = null;
